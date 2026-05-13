@@ -63,7 +63,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
       setErrorMsg(msg);
       return;
     }
-    router.push("/");
+    router.push("/dashboard");
     router.refresh();
   }
 
