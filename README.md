@@ -1,36 +1,122 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ExpenseTracking Audit
 
-## Getting Started
+A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-First, run the development server:
+> **Status:** UI scaffold only. Auth pages are visual; no backend wired yet.
 
-```bash
+---
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 15 (App Router, TypeScript) |
+| Styling | Tailwind CSS v4 (CSS-variable theming, `@theme inline`) |
+| Theming | `next-themes` (light / dark / system) |
+| Icons | `lucide-react` |
+| Animation | `framer-motion` (micro-interactions only) |
+| Font | Inter (SF Pro / Roboto stand-in) |
+
+---
+
+## Getting started
+
+```powershell
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Path | Description |
+|---|---|
+| `/` | Landing page |
+| `/login` | Sign in (Google + manual email/password — UI only) |
+| `/signup` | Create account (UI only) |
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Project structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/
+│   ├── (auth)/
+│   │   ├── layout.tsx        Shared auth shell
+│   │   ├── login/page.tsx
+│   │   └── signup/page.tsx
+│   ├── globals.css           Tailwind v4 @theme + CSS variables
+│   ├── layout.tsx            Root layout + ThemeProvider
+│   └── page.tsx              Landing
+└── components/
+    ├── auth-card.tsx         Login + signup card (mode prop)
+    ├── google-button.tsx
+    ├── theme-provider.tsx
+    └── theme-toggle.tsx
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Design system
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+All colors are CSS variables. Tweak them in [`src/app/globals.css`](src/app/globals.css):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```css
+:root {            /* light */
+  --purple: #8b5cf6;
+  --orange: #f97316;
+  /* ... */
+}
+.dark {            /* dark */
+  --purple: #a78bfa;
+  --orange: #fb923c;
+  /* ... */
+}
+```
+
+Tailwind utilities (`text-purple`, `bg-card`, `border-border`, etc.) are wired through `@theme inline` — no `tailwind.config.js` needed.
+
+### Visual primitives
+
+| Class | Effect |
+|---|---|
+| `.auth-backdrop` | Ambient radial purple/orange backdrop |
+| `.card-glow` | Gradient border on hover / focus-within (CSS mask, no JS) |
+| `.input-glow` | Purple focus glow on inputs |
+| `.input-glow.alt` | Orange focus glow variant |
+
+### Primary CTA gradient
+
+```css
+background: linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%);
+```
+
+---
+
+## Scripts
+
+```powershell
+npm run dev          # dev server
+npm run build        # production build
+npm start            # serve production build
+npm run lint         # eslint
+npx tsc --noEmit     # type-check
+```
+
+---
+
+## Roadmap
+
+- [x] Auth UI (login + signup, Google button, dark/light toggle)
+- [ ] Auth backend (provider TBD — NextAuth or Supabase)
+- [ ] Dashboard shell (sidebar, top bar)
+- [ ] Expense entry + audit log
+- [ ] Multi-user roles & permissions
+
+---
+
+## License
+
+Private — not for redistribution.
