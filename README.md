@@ -2,7 +2,7 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth complete (email/password + Google via Supabase). Dashboard not built yet.
+> **Status:** Auth complete (email/password + Google via Supabase). Dashboard shell live — glass-pill navbar with responsive hamburger, placeholder pages pending.
 
 ---
 
@@ -50,6 +50,11 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 | `/login` | Sign in (Google + manual email/password) |
 | `/signup` | Create account (Google + manual email/password, confirmation required) |
 | `/auth/callback` | OAuth + email-confirm code exchange (no UI) |
+| `/dashboard` | Authenticated landing page (Welcome) |
+| `/dashboard/transactions` | Placeholder — not yet built |
+| `/dashboard/budgets` | Placeholder — not yet built |
+| `/dashboard/analytics` | Placeholder — not yet built |
+| `/dashboard/subscriptions` | Placeholder — not yet built |
 
 ---
 
@@ -64,14 +69,19 @@ src/
 │   │   └── signup/page.tsx
 │   ├── auth/
 │   │   └── callback/route.ts OAuth + email-confirm callback
-│   ├── globals.css           Tailwind v4 @theme + CSS variables
+│   ├── dashboard/
+│   │   ├── layout.tsx        Dashboard shell (backdrop + sticky nav)
+│   │   └── page.tsx          Welcome
+│   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill
 │   ├── layout.tsx            Root layout + ThemeProvider
 │   └── page.tsx              Landing
 ├── components/
 │   ├── auth-card.tsx         Login + signup card (mode prop)
+│   ├── dashboard-nav.tsx     Responsive glass-pill navbar (5 items + hamburger)
 │   ├── google-button.tsx     Google OAuth (wired)
 │   ├── theme-provider.tsx
-│   └── theme-toggle.tsx
+│   ├── theme-toggle.tsx
+│   └── user-menu.tsx         User icon dropdown (signed-in email, profile, sign out)
 ├── lib/supabase/
 │   ├── client.ts             Browser client
 │   ├── server.ts             Server client
@@ -108,6 +118,7 @@ Tailwind utilities (`text-purple`, `bg-card`, `border-border`, etc.) are wired t
 | `.card-glow` | Gradient border on hover / focus-within (CSS mask, no JS) |
 | `.input-glow` | Purple focus glow on inputs |
 | `.input-glow.alt` | Orange focus glow variant |
+| `.glass-pill` | Liquid-glass surface (backdrop blur + saturate, hairline border, inner highlight) — used by the dashboard navbar |
 
 ### Primary CTA gradient
 
@@ -133,8 +144,10 @@ npx tsc --noEmit     # type-check
 
 - [x] Auth UI (login + signup, Google button, dark/light toggle)
 - [x] Auth backend (Supabase — email/password with confirmation, Google OAuth, session middleware)
-- [ ] Dashboard shell (sidebar, top bar)
-- [ ] Expense entry + audit log
+- [x] Dashboard shell (responsive glass-pill navbar, sign-out, ETM brand mark)
+- [ ] Transactions, Budgets, Analytics, Subscriptions pages
+- [ ] Profile page + user-menu redesign
+- [ ] Security hardening (see [`things_tbd_later.md`](things_tbd_later.md))
 - [ ] Multi-user roles & permissions
 
 ---

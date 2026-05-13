@@ -23,6 +23,7 @@ A secure, multi-user financial dashboard. Design and security are first-class.
   - `.auth-backdrop` — ambient radial purple/orange backdrop for auth-style screens
   - `.card-glow` — gradient border that appears on hover/focus-within (pure CSS mask)
   - `.input-glow` (`.input-glow.alt` for orange) — focus glow on form inputs
+  - `.glass-pill` — liquid-glass surface (backdrop blur + saturate, hairline border, inner highlight, soft drop shadow). Tuned separately for light and dark. Used by the dashboard navbar.
 
 ## File layout
 
@@ -34,15 +35,20 @@ src/
 │   │   ├── login/page.tsx    /login
 │   │   └── signup/page.tsx   /signup
 │   ├── auth/
-│   │   └── callback/route.ts OAuth + email-confirm code exchange → session cookie
-│   ├── globals.css           Tailwind v4 @theme + CSS vars + glow utilities
+│   │   └── callback/route.ts OAuth + email-confirm code exchange → session cookie (default redirect → /dashboard)
+│   ├── dashboard/
+│   │   ├── layout.tsx        Dashboard shell (soft radial backdrop + sticky DashboardNav)
+│   │   └── page.tsx          Welcome (will become the real dashboard home)
+│   ├── globals.css           Tailwind v4 @theme + CSS vars + glow utilities + .glass-pill
 │   ├── layout.tsx            Root: Inter font + ThemeProvider
 │   └── page.tsx              Landing page
 ├── components/
-│   ├── auth-card.tsx         Login + signup card (single component, `mode` prop)
+│   ├── auth-card.tsx         Login + signup card (single component, `mode` prop). Login redirects to /dashboard.
+│   ├── dashboard-nav.tsx     Responsive glass-pill navbar — ETM brand, 5 items, hamburger below md
 │   ├── google-button.tsx     Google OAuth button (wired to supabase.auth.signInWithOAuth)
 │   ├── theme-provider.tsx    next-themes wrapper
-│   └── theme-toggle.tsx      Sun/Moon toggle with motion icon swap
+│   ├── theme-toggle.tsx      Sun/Moon toggle with motion icon swap
+│   └── user-menu.tsx         User-icon dropdown — signed-in email, profile (placeholder), sign-out
 ├── lib/
 │   └── supabase/
 │       ├── client.ts         Browser client (Client Components)
@@ -61,6 +67,9 @@ src/
 - **Adding pages with the auth aesthetic:** drop them under `src/app/(auth)/` to inherit the shell, or replicate the `auth-backdrop` + `card-glow` pattern.
 - **Adding accent colors:** don't. Extend `--purple` / `--orange` or add a new CSS var in both `:root` and `.dark`, then expose it through `@theme inline`.
 - **Accessibility:** Respect `prefers-reduced-motion` (already short-circuited in `globals.css`). All interactive elements must have visible focus states (use `focus-visible:ring-2 focus-visible:ring-ring`).
+- **Responsive-first:** Every component must work on mobile (~375px), tablet (~768px), and desktop (~1280px+) from v1 — not retrofitted later. Default to a mobile layout and progressively enhance with `md:` / `lg:` breakpoints.
+- **Nav active/hover pattern:** active link = `bg-muted` pill with `text-foreground`. Inactive link = `text-muted-foreground` with a 2px `bg-purple` underline that scales from `origin-left` on hover (300ms ease-out). Single accent only — no rainbow/gradient hover effects.
+- **Post-auth pages:** drop under `src/app/dashboard/` to inherit the shell ([dashboard/layout.tsx](src/app/dashboard/layout.tsx) — soft backdrop + `DashboardNav`).
 
 ## Working style with the user
 
