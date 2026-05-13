@@ -1,34 +1,66 @@
 "use client";
 
+import * as React from "react";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 
 export function GoogleButton({
   label = "Continue with Google",
-  onClick,
 }: {
   label?: string;
-  onClick?: () => void;
 }) {
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function handleClick() {
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: "select_account" },
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    }
+  }
+
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 400, damping: 22 }}
-      className="group relative w-full overflow-hidden rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <span className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            "linear-gradient(135deg, var(--purple-soft), transparent 40%, var(--orange-soft))",
-        }}
-      />
-      <span className="flex items-center justify-center gap-3">
-        <GoogleIcon className="h-[18px] w-[18px]" />
-        {label}
-      </span>
-    </motion.button>
+    <div className="space-y-2">
+      <motion.button
+        type="button"
+        onClick={handleClick}
+        disabled={loading}
+        whileHover={loading ? undefined : { y: -1 }}
+        whileTap={loading ? undefined : { scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 400, damping: 22 }}
+        className="group relative w-full overflow-hidden rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        <span
+          className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--purple-soft), transparent 40%, var(--orange-soft))",
+          }}
+        />
+        <span className="flex items-center justify-center gap-3">
+          <GoogleIcon className="h-[18px] w-[18px]" />
+          {loading ? "Redirecting…" : label}
+        </span>
+      </motion.button>
+      {error && (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+        >
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

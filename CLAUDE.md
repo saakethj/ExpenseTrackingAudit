@@ -11,6 +11,7 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 - **Theme:** `next-themes` with `attribute="class"`, `defaultTheme="dark"`, `enableSystem`. Toggle is `<ThemeToggle />`.
 - **Icons:** `lucide-react`
 - **Animation:** `framer-motion` — micro-interactions only (hover lift, tap scale, icon swap, card mount). No layout animations.
+- **Auth & DB:** Supabase (`@supabase/ssr` + `@supabase/supabase-js`). Email/password (confirmation required) + Google OAuth.
 
 ## Design system (do not drift without asking)
 
@@ -32,20 +33,31 @@ src/
 │   │   ├── layout.tsx        Shared auth shell (logo header, theme toggle, backdrop)
 │   │   ├── login/page.tsx    /login
 │   │   └── signup/page.tsx   /signup
+│   ├── auth/
+│   │   └── callback/route.ts OAuth + email-confirm code exchange → session cookie
 │   ├── globals.css           Tailwind v4 @theme + CSS vars + glow utilities
 │   ├── layout.tsx            Root: Inter font + ThemeProvider
 │   └── page.tsx              Landing page
-└── components/
-    ├── auth-card.tsx         Login + signup card (single component, `mode` prop)
-    ├── google-button.tsx     Google OAuth button (UI only — no backend yet)
-    ├── theme-provider.tsx    next-themes wrapper
-    └── theme-toggle.tsx      Sun/Moon toggle with motion icon swap
+├── components/
+│   ├── auth-card.tsx         Login + signup card (single component, `mode` prop)
+│   ├── google-button.tsx     Google OAuth button (wired to supabase.auth.signInWithOAuth)
+│   ├── theme-provider.tsx    next-themes wrapper
+│   └── theme-toggle.tsx      Sun/Moon toggle with motion icon swap
+├── lib/
+│   └── supabase/
+│       ├── client.ts         Browser client (Client Components)
+│       ├── server.ts         Server client (Server Components / Route Handlers)
+│       └── middleware.ts     Session-refresh helper used by src/middleware.ts
+└── middleware.ts             Refreshes Supabase session cookie on every request
 ```
 
 ## Conventions
 
 - **Server vs client:** Pages stay server components when possible; interactive pieces (`AuthCard`, `ThemeToggle`, `GoogleButton`) are `"use client"`.
-- **Forms:** UI-only right now. Backend auth has not been wired — do not invent backend logic without asking.
+- **Supabase clients:** never import `client.ts` from a Server Component or `server.ts` from a Client Component. Browser → `@/lib/supabase/client`. Server / Route Handlers / Server Actions → `@/lib/supabase/server`.
+- **Middleware rule:** in [src/lib/supabase/middleware.ts](src/lib/supabase/middleware.ts), do not insert code between `createServerClient(...)` and `supabase.auth.getUser()` — it breaks session refresh in subtle ways.
+- **Env vars:** only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` belong in the browser. The `service_role` key must never appear in any `NEXT_PUBLIC_*` var or client-imported file.
+- **Auth redirects:** OAuth + email-confirm links route through `/auth/callback`. If you change that path, update the allow-list in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
 - **Adding pages with the auth aesthetic:** drop them under `src/app/(auth)/` to inherit the shell, or replicate the `auth-backdrop` + `card-glow` pattern.
 - **Adding accent colors:** don't. Extend `--purple` / `--orange` or add a new CSS var in both `:root` and `.dark`, then expose it through `@theme inline`.
 - **Accessibility:** Respect `prefers-reduced-motion` (already short-circuited in `globals.css`). All interactive elements must have visible focus states (use `focus-visible:ring-2 focus-visible:ring-ring`).
