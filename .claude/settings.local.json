@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"c:\\\\Users\\\\saake\\\\Downloads\\\\Saaki_personal\\\\Dev\\\\expense-tracking-audit\")",
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --app --src-dir --import-alias \"@/*\" --eslint --no-turbopack --use-npm --yes)"
+    ]
+  }
+}
