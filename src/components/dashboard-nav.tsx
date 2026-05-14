@@ -44,9 +44,9 @@ export function DashboardNav() {
               <Image
                 src="/logo.png" // Make sure this matches your filename in the public folder
                 alt="ETM Logo"
-                width={240} 
+                width={240}
                 height={60}
-                className="h-8 w-auto sm:h-10" // This ensures it scales proportionally and fits the nav height
+                className="h-11 w-auto sm:h-14"
                 priority
               />
             </Link>

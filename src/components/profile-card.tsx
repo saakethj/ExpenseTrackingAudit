@@ -463,8 +463,8 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
         <section
           className="grid relative overflow-hidden"
           style={{
-            height: '80svh',
-            maxHeight: '540px',
+            height: 'var(--pc-height, 80svh)',
+            maxHeight: 'var(--pc-max-height, 540px)',
             aspectRatio: '0.718',
             borderRadius: cardRadius,
             backgroundBlendMode: 'color-dodge, normal, normal, normal',
@@ -595,17 +595,17 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
               style={{
                 transform:
                   'translate3d(calc(var(--pointer-from-left) * -6px + 3px), calc(var(--pointer-from-top) * -6px + 3px), 0.1px)',
-                mixBlendMode: 'luminosity',
                 gridArea: '1 / -1',
                 borderRadius: cardRadius,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 0, 0, 0.35)'
               }}
             >
-              <div className="w-full absolute flex flex-col" style={{ top: '3em', display: 'flex', gridArea: 'auto' }}>
+              <div className="w-full absolute flex flex-col" style={{ top: 'var(--pc-text-top, 3em)', display: 'flex', gridArea: 'auto' }}>
                 <h3
                   className="font-semibold m-0"
                   style={{
-                    fontSize: 'min(5svh, 3em)',
+                    fontSize: 'var(--pc-name-size, min(5svh, 3em))',
                     backgroundImage: 'var(--pc-name-gradient)',
                     backgroundSize: '1em 1.5em',
                     WebkitTextFillColor: 'transparent',
@@ -623,8 +623,8 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
                   className="font-semibold whitespace-nowrap mx-auto w-min"
                   style={{
                     position: 'relative',
-                    top: '-12px',
-                    fontSize: '16px',
+                    top: 'var(--pc-title-top, -12px)',
+                    fontSize: 'var(--pc-title-size, 16px)',
                     margin: '0 auto',
                     backgroundImage: 'var(--pc-title-gradient)',
                     backgroundSize: '1em 1.5em',

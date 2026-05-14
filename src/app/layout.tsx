@@ -12,6 +12,13 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ExpenseTracking Audit",
   description: "Secure, multi-user financial dashboard.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logo.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: { url: "/logo.png", sizes: "180x180" },
+  },
 };
 
 export default function RootLayout({
