@@ -43,6 +43,16 @@ export default async function ProfilePage() {
   const gender = (meta.gender as string | undefined) ?? "";
   const country = (meta.country as string | undefined) ?? "";
 
+  const prefCurrency = (meta.pref_currency as string | undefined) ?? "USD";
+  const prefNumberFormat = (meta.pref_number_format as string | undefined) ?? "1,000.00";
+  const prefDateFormat = (meta.pref_date_format as string | undefined) ?? "MM/DD/YYYY";
+  const prefTimezone =
+    (meta.pref_timezone as string | undefined) ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const prefWeekStart = (meta.pref_week_start as string | undefined) ?? "sunday";
+  const prefFiscalYearStart =
+    (meta.pref_fiscal_year_start as string | undefined) ?? "January";
+
   const provider = (user.app_metadata?.provider as string | undefined) ?? "email";
   const hasPassword = (user.identities ?? []).some((id) => id.provider === "email");
 
@@ -64,6 +74,14 @@ export default async function ProfilePage() {
           lastName={lastName}
           gender={gender}
           country={country}
+          preferences={{
+            currency: prefCurrency,
+            numberFormat: prefNumberFormat,
+            dateFormat: prefDateFormat,
+            timezone: prefTimezone,
+            weekStart: prefWeekStart,
+            fiscalYearStart: prefFiscalYearStart,
+          }}
         />
 
         {/* Right: profile card + avatar controls */}

@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import { ProfileNav, type ProfileNavKey } from "@/components/profile-nav";
 import { GeneralPanel, type GeneralPanelProps } from "@/components/general-panel";
+import {
+  PreferencesPanel,
+  type PreferencesPanelProps,
+} from "@/components/preferences-panel";
 
 type NavItem = { key: ProfileNavKey; label: string; icon: LucideIcon };
 type Section = { title: string; items: NavItem[] };
@@ -57,9 +61,9 @@ function sectionIndexForKey(key: ProfileNavKey): number {
   return SECTIONS.findIndex((s) => s.items.some((i) => i.key === key));
 }
 
-type Props = GeneralPanelProps;
+type Props = GeneralPanelProps & { preferences: PreferencesPanelProps };
 
-export function ProfileShell(props: Props) {
+export function ProfileShell({ preferences, ...props }: Props) {
   const [active, setActive] = React.useState<ProfileNavKey>("general");
   const [openSection, setOpenSection] = React.useState<number>(-1);
 
@@ -191,7 +195,18 @@ export function ProfileShell(props: Props) {
               <GeneralPanel {...props} />
             </motion.div>
           )}
-          {active !== "general" && (
+          {active === "preferences" && (
+            <motion.div
+              key="preferences"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <PreferencesPanel {...preferences} />
+            </motion.div>
+          )}
+          {active !== "general" && active !== "preferences" && (
             <motion.div
               key={active}
               initial={{ opacity: 0, y: 8 }}
