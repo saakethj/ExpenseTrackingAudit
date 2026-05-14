@@ -43,6 +43,14 @@
   --purple-soft: rgba(139, 92, 246, 0.18);
   --orange: #f97316;
   --orange-soft: rgba(249, 115, 22, 0.18);
+
+  /* Profile card (light) */
+  --pc-base: rgba(245, 242, 255, 0.92);
+  --pc-inner-gradient: linear-gradient(145deg, #ede7f8 0%, #f7e9dc 100%);
+  --pc-name-gradient: linear-gradient(to bottom, #1a1530, #6f5fbe);
+  --pc-title-gradient: linear-gradient(to bottom, #2a2050, #4a3ac0);
+  --pc-glow-color: rgba(167, 139, 250, 0.45);
+  --pc-silhouette: #8a8a96;
 }
 
 /* Dark theme */
@@ -61,6 +69,14 @@
   --purple-soft: rgba(167, 139, 250, 0.22);
   --orange: #fb923c;
   --orange-soft: rgba(251, 146, 60, 0.22);
+
+  /* Profile card (dark) */
+  --pc-base: rgba(0, 0, 0, 0.9);
+  --pc-inner-gradient: linear-gradient(145deg, #60496e8c 0%, #71C4FF44 100%);
+  --pc-name-gradient: linear-gradient(to bottom, #fff, #6f6fbe);
+  --pc-title-gradient: linear-gradient(to bottom, #fff, #4a4ac0);
+  --pc-glow-color: rgba(125, 190, 255, 0.67);
+  --pc-silhouette: #6b6b75;
 }
 
 html,
