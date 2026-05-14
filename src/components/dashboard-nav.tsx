@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image"; // Add this import
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
@@ -33,21 +34,24 @@ export function DashboardNav() {
     <header className="sticky top-3 z-20 px-3 sm:top-4 sm:px-6">
       <div className="glass-pill mx-auto max-w-7xl rounded-2xl">
         <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-7 md:grid md:grid-cols-[1fr_auto_1fr]">
+          
+          {/* UPDATED LOGO SECTION */}
           <div className="flex items-center">
             <Link
               href="/dashboard"
-              className="group flex items-center gap-2 sm:gap-2.5"
+              className="group flex items-center transition-transform duration-300 hover:scale-105"
             >
-              <span
-                className="inline-block h-6 w-6 rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105 sm:h-7 sm:w-7"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%)",
-                }}
+              <Image
+                src="/logo.png" // Make sure this matches your filename in the public folder
+                alt="ETM Logo"
+                width={240} 
+                height={60}
+                className="h-8 w-auto sm:h-10" // This ensures it scales proportionally and fits the nav height
+                priority
               />
-              <span className="text-base font-bold tracking-tight">ETM</span>
             </Link>
           </div>
+          {/* END UPDATED LOGO SECTION */}
 
           <nav className="hidden items-center gap-1 md:flex">
             {NAV_ITEMS.map((item) => {
