@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { Plus, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSummaryCards } from "@/components/dashboard-summary-cards";
 import { DashboardRecentTransactions } from "@/components/dashboard-recent-transactions";
 import { DashboardCategoryBreakdown } from "@/components/dashboard-category-breakdown";
+import { AddTransactionButton } from "@/components/add-transaction-button";
 
 function getGreeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -67,29 +67,7 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            className="card-glow group relative flex w-full shrink-0 items-center gap-4 overflow-hidden rounded-2xl border border-border bg-card/60 px-5 py-4 text-left backdrop-blur-xl transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:min-w-[280px]"
-          >
-            <span
-              aria-hidden
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-soft text-purple transition-transform duration-200 group-hover:scale-105"
-            >
-              <Plus className="h-5 w-5" strokeWidth={2.5} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold leading-tight text-foreground">
-                Add Transaction
-              </span>
-              <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
-                Log a new expense or income
-              </span>
-            </span>
-            <ChevronRight
-              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground"
-              aria-hidden
-            />
-          </button>
+          <AddTransactionButton />
         </header>
 
         <DashboardSummaryCards />
