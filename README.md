@@ -2,9 +2,9 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system (density, font scale, accent colors, reduced motion) ✅
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add Transaction (modal + server action + RLS) ✅
 >
-> **Next:** Transaction list + quick-add form + summary cards (Phase 1: Dashboard MVP)
+> **Next:** Row-level edit on Recent Transactions → CSV import → wire summary cards / recent / breakdown to real DB rows
 
 ---
 
@@ -52,9 +52,9 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 | `/login` | ✅ | Sign in (Google + email/password) |
 | `/signup` | ✅ | Create account (Google + email/password, confirmation required) |
 | `/auth/callback` | ✅ | OAuth + email-confirm code exchange (no UI) |
-| `/dashboard` | ✅ | Authenticated home (Welcome/summary — will show transactions + cards) |
+| `/dashboard` | ✅ | Greeting + glass date card, "Manage your money" quick actions, summary cards, recent transactions, category breakdown. Add Transaction modal writes live to Supabase. |
 | `/dashboard/profile` | ✅ | User profile with 5 working sections: General, Preferences, Categories, Appearance, Notifications |
-| `/dashboard/transactions` | ⏳ | Transaction list view (Phase 1) |
+| `/dashboard/transactions` | ⏳ | Full transaction list with filters (next phase) |
 | `/dashboard/budgets` | 📋 | Budget tracking (Phase 2) |
 | `/dashboard/analytics` | 📋 | Charts & reports (Phase 2) |
 | `/dashboard/subscriptions` | 📋 | Subscription tracking (Phase 3) |
@@ -74,15 +74,17 @@ src/
 │   │   └── callback/route.ts OAuth + email-confirm callback → session cookie
 │   ├── dashboard/
 │   │   ├── layout.tsx        Dashboard shell (soft backdrop + sticky DashboardNav)
-│   │   ├── page.tsx          Home/Welcome (will show transactions + summary)
+│   │   ├── page.tsx          Home: greeting + glass date card + quick actions + summary + recent + category breakdown
 │   │   ├── transactions/
-│   │   │   └── page.tsx      Transaction list (NOT YET BUILT)
+│   │   │   └── page.tsx      Full transaction list (NOT YET BUILT)
 │   │   ├── profile/
 │   │   │   ├── page.tsx      User profile container (fetches user_metadata)
 │   │   │   └── (actions)     Server actions for profile operations
 │   │   │       ├── notifications-actions.ts
 │   │   │       ├── preferences-actions.ts
 │   │   │       └── categories-actions.ts
+│   ├── actions/
+│   │   └── transactions-actions.ts  addTransaction server action (whitelist validation, RLS-aware)
 │   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill + density/font-scale overrides
 │   ├── layout.tsx            Root layout (Inter font, ThemeProvider, DensityProvider)
 │   └── page.tsx              Landing page
@@ -99,7 +101,12 @@ src/
 │   ├── preferences-panel.tsx   Language, currency, timezone (placeholder)
 │   ├── general-panel.tsx     User info (placeholder for avatar/name edit)
 │   ├── categories-panel.tsx  Category CRUD with animated modal
-│   └── profile-shell.tsx     Profile sidebar nav + content switcher
+│   ├── profile-shell.tsx     Profile sidebar nav + content switcher
+│   ├── dashboard-actions.tsx Quick-actions section (Add Transaction + Import CSV placeholder) — owns modal + toast
+│   ├── add-transaction-modal.tsx     Quick-add transaction modal wired to addTransaction server action
+│   ├── dashboard-summary-cards.tsx       4 KPI cards (mock data — DB wiring pending)
+│   ├── dashboard-recent-transactions.tsx Recent transactions list (mock — DB wiring pending)
+│   └── dashboard-category-breakdown.tsx  Horizontal bars by category (mock — DB wiring pending)
 ├── lib/supabase/
 │   ├── client.ts             Browser client (for Client Components)
 │   ├── server.ts             Server client (for Server Components / Server Actions)
@@ -138,11 +145,13 @@ Tailwind utilities (`text-purple`, `bg-card`, `border-border`, etc.) are wired t
 | `.input-glow.alt` | Orange focus glow variant |
 | `.glass-pill` | Liquid-glass surface (backdrop blur + saturate, hairline border, inner highlight) — used by the dashboard navbar |
 
-### Primary CTA gradient
+### Accent gradient (use sparingly)
 
 ```css
 background: linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%);
 ```
+
+Reserved for **accent text and brand marks only** — the first name in the greeting, a single emphasized word in a heading, the big day number on the date card, the logo. **Never** used as a button fill or repeated surface decoration. Default CTAs are solid `bg-purple text-white hover:bg-purple/90`. One focal point per section.
 
 ### Appearance system (user-customizable)
 
@@ -156,6 +165,28 @@ Users can personalize the app via `/dashboard/profile` → Appearance section:
 | **Reduce Motion** | On/Off | `data-reduced-motion` attribute |
 
 All settings persist to `localStorage` (keys: `etm-density`, `etm-font-scale`, `etm-accent`, `etm-reduced-motion`) and are applied via `DensityProvider` React Context. CSS variable overrides in `globals.css` support dark mode and accent preset switching seamlessly.
+
+---
+
+## Database
+
+Live tables in Supabase (Postgres). All financial tables enforce row-level security via `auth.uid() = user_id`.
+
+### `public.transactions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `user_id` | `uuid` FK → `auth.users(id)` | `ON DELETE CASCADE` |
+| `type` | `text` | `CHECK (type IN ('expense', 'income'))` |
+| `amount` | `numeric(12, 2)` | `CHECK (amount > 0)` — exact decimal money |
+| `category` | `text` | Plain label, not an FK — renames don't mutate historical rows |
+| `payment_mode` | `text` | `CHECK IN ('cash', 'card', 'upi', 'bank', 'other')` |
+| `date` | `date` | Transaction date (not creation timestamp) |
+| `note` | `text` nullable | Optional |
+| `created_at` / `updated_at` | `timestamptz` | `updated_at` auto-maintained by `set_updated_at()` trigger |
+
+Indexed on `(user_id, date DESC)`. RLS policies cover all four CRUD operations, each gated on `auth.uid() = user_id`. Validation runs twice — server action whitelists enums *and* the DB enforces CHECK constraints (defense in depth).
 
 ---
 
@@ -177,16 +208,18 @@ npx tsc --noEmit     # type-check
 - [x] Auth UI + backend (email/password + Google OAuth, session middleware)
 - [x] Dashboard shell (responsive navbar, sign-out, ETM brand)
 - [x] User profile system (General, Preferences, Categories, Appearance, Notifications sections)
-- [ ] Transaction list view (date, category, amount, note) + quick-add form
-- [ ] Summary cards (income, expenses, net, by-category breakdown)
-- [ ] Category filter + date range picker
-- [ ] Home dashboard (shows summary cards + recent transactions)
+- [x] Dashboard home UI — greeting + glass date card, quick-actions section, summary cards, recent transactions, category breakdown
+- [x] Add Transaction — modal with validation, server action with whitelist + RLS, success toast, `transactions` table
+- [ ] Row-level edit on Recent Transactions (same modal in `edit` mode) + delete with confirm
+- [ ] CSV import (two-step modal: upload + auto-detect → column mapping → commit)
+- [ ] Wire summary cards / recent / category breakdown to real DB aggregates
+- [ ] Full `/dashboard/transactions` list with category + date-range + type filters
 
 **Phase 2: Insights** (after MVP is stable)
 - [ ] Spending charts (line over time, pie by category)
 - [ ] Monthly/weekly reports
 - [ ] Budget tracking (spend vs limit)
-- [ ] Import/Export (CSV)
+- [ ] Export (CSV)
 - [ ] Analytics page
 
 **Phase 3: Account & Compliance** (later)

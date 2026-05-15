@@ -6,27 +6,29 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 
 ## Status
 
-**✅ Complete:** Auth (email/password + Google OAuth), Dashboard shell, User profile system
+**✅ Complete:** Auth (email/password + Google OAuth), Dashboard shell, User profile system, Dashboard home UI, Add Transaction flow (DB-wired)
 - Profile sections: General, Preferences, Categories, Appearance, Notifications — all functional
 - Appearance system: density (comfortable/compact), font scale (normal/large), accent colors (5 presets), reduced motion toggle
+- Dashboard home: greeting + glass date card, "Manage your money" quick-actions section, summary cards (mock), recent transactions (mock), category breakdown (mock)
+- Add Transaction: full modal with validation, server action with whitelist validation, top-center success toast — writes to `transactions` table with RLS enforced
 
-**⏳ Next:** Dashboard core (transaction list, quick-add form, summary cards)
+**⏳ Next:** Row-level edit on Recent Transactions (Phase 2 of the current refactor), then wire summary cards / recent / breakdown to real DB rows
 
-**📋 Later:** Charts, Import/Export, Billing, advanced user settings, role-based permissions
+**📋 Later:** CSV import flow, full `/dashboard/transactions` list page with filters, charts, budgets, billing, role-based access
 
-## Roadmap (3 phases)
+## Roadmap
 
-**Phase 1: Dashboard MVP** (NOW)
-- Transaction list view (date, category, amount, note)
-- Quick-add transaction form
-- Summary cards (income, expenses, net, by-category)
-- Category filter + date range picker
+**Current refactor (dashboard data flow):**
+1. ✅ Dashboard UI shell + Add Transaction (modal + server action + toast + RLS)
+2. ⏳ Row-level edit — clicking a Recent Transactions row opens the same modal pre-filled (`mode: "create" | "edit"`); adds delete with confirm
+3. 📋 CSV import — two-step modal: upload + column auto-detect/preview → user maps columns + bulk-assigns category → commit
+4. 📋 Wire summary cards, recent transactions, and category breakdown to real DB aggregates
 
 **Phase 2: Insights**
-- Spending charts (line graph over time, pie by category)
+- Spending charts (line over time, pie by category)
 - Monthly/weekly summary reports
 - Budget tracking (spend vs limit)
-- Import/Export (CSV)
+- Analytics page
 
 **Phase 3: Account & Compliance** (later, when MVP is stable)
 - Privacy & Security (data access, connected integrations)
@@ -48,7 +50,7 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 - Dark-first, purple + orange gradient accents. Light parity is required.
 - All colors are CSS variables defined in [src/app/globals.css](src/app/globals.css) under `:root` (light) and `.dark` (dark).
 - Tailwind utilities map to those vars via `@theme inline`: `bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `border-border`, `text-purple`, `text-orange`, `ring-ring`, etc.
-- Primary CTAs and brand marks use the gradient: `linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%)`.
+- The purple→orange gradient (`linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%)`) is reserved for **accent text and brand marks only** — first name in the greeting, a single emphasized word in a heading, the big day number on the date card, the logo. **Never** use it as a button fill, card background, or repeated surface decoration. Default CTAs to solid `bg-purple text-white hover:bg-purple/90`. One focal point per section.
 - Reusable visual primitives in `globals.css`:
   - `.auth-backdrop` — ambient radial purple/orange backdrop for auth-style screens
   - `.card-glow` — gradient border that appears on hover/focus-within (pure CSS mask)
@@ -68,15 +70,17 @@ src/
 │   │   └── callback/route.ts OAuth + email-confirm code exchange → session cookie (default redirect → /dashboard)
 │   ├── dashboard/
 │   │   ├── layout.tsx        Dashboard shell (soft radial backdrop + sticky DashboardNav)
-│   │   ├── page.tsx          Welcome/home (will show summary + recent transactions)
+│   │   ├── page.tsx          Home: greeting + glass date card, DashboardActions, summary cards, recent + category breakdown
 │   │   ├── transactions/
-│   │   │   └── page.tsx      Transaction list (NOT YET BUILT)
+│   │   │   └── page.tsx      Full transaction list with filters (NOT YET BUILT)
 │   │   ├── profile/
 │   │   │   └── page.tsx      User profile (fetches prefs from auth.user.user_metadata)
 │   │   └── actions/
 │   │       ├── notifications-actions.ts  Save notification prefs to user_metadata
 │   │       ├── preferences-actions.ts    Save language + currency preferences
 │   │       └── categories-actions.ts     CRUD operations on categories table
+│   ├── actions/
+│   │   └── transactions-actions.ts  addTransaction server action (whitelist validation, RLS-aware, revalidates /dashboard)
 │   ├── globals.css           Tailwind v4 @theme + CSS vars + glow utilities + .glass-pill + density/font-scale/accent overrides
 │   ├── layout.tsx            Root: Inter font + ThemeProvider + DensityProvider
 │   └── page.tsx              Landing page
@@ -93,7 +97,12 @@ src/
 │   ├── preferences-panel.tsx   Language, currency, timezone (placeholder)
 │   ├── general-panel.tsx     User name, avatar (placeholder)
 │   ├── categories-panel.tsx  Category CRUD with modal (create, edit, delete)
-│   └── profile-shell.tsx     Profile sidebar nav + content area switcher
+│   ├── profile-shell.tsx     Profile sidebar nav + content area switcher
+│   ├── dashboard-actions.tsx Quick-actions section: heading + Add Transaction (solid purple) + Import CSV (disabled "Soon")
+│   ├── add-transaction-modal.tsx  Modal: type toggle, amount, category dropdown (portaled), payment mode pills, date, note → addTransaction server action
+│   ├── dashboard-summary-cards.tsx     4 KPI cards: Net / Spent / Income / Savings Rate (mock data — to be DB-wired)
+│   ├── dashboard-recent-transactions.tsx  Recent transactions list (mock — to be DB-wired, will host row-level edit)
+│   └── dashboard-category-breakdown.tsx   Horizontal bars by category (mock — to be DB-wired)
 ├── lib/
 │   └── supabase/
 │       ├── client.ts         Browser client (Client Components)
@@ -101,6 +110,29 @@ src/
 │       └── middleware.ts     Session-refresh helper used by src/middleware.ts
 └── middleware.ts             Refreshes Supabase session cookie on every request
 ```
+
+## Database
+
+Live tables in Supabase (Postgres). All financial tables enforce row-level security via `auth.uid() = user_id`.
+
+### `public.transactions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `user_id` | `uuid` FK → `auth.users(id)` | `ON DELETE CASCADE` |
+| `type` | `text` | `CHECK (type IN ('expense', 'income'))` |
+| `amount` | `numeric(12, 2)` | `CHECK (amount > 0)` — exact decimal money, no floats |
+| `category` | `text` | Plain text label, **not** an FK — historical records stay stable if a category is renamed |
+| `payment_mode` | `text` | `CHECK (payment_mode IN ('cash', 'card', 'upi', 'bank', 'other'))` |
+| `date` | `date` | Transaction date (not creation timestamp) |
+| `note` | `text` nullable | Optional |
+| `created_at` | `timestamptz` | `default now()` |
+| `updated_at` | `timestamptz` | `default now()`, maintained by `trg_transactions_updated_at` trigger via `set_updated_at()` |
+
+- **Index:** `idx_transactions_user_date` on `(user_id, date DESC)` for the common dashboard query pattern
+- **RLS:** 4 policies — `users_select_own`, `users_insert_own`, `users_update_own`, `users_delete_own`, all gated on `auth.uid() = user_id`
+- **Validation is defense-in-depth:** server action whitelists enums *and* the DB enforces CHECK constraints. Never relax one expecting the other to catch it.
 
 ## Conventions
 
