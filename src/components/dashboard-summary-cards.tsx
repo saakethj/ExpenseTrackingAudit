@@ -1,73 +1,120 @@
-import { ArrowDownRight, ArrowUpRight, Wallet, TrendingDown, TrendingUp, PiggyBank } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Minus,
+  Wallet,
+  TrendingDown,
+  TrendingUp,
+  PiggyBank,
+} from "lucide-react";
+import type { MonthlySummary } from "@/app/actions/transactions-actions";
 
-type Trend = "up" | "down" | "flat";
+type Tone = "neutral" | "expense" | "income" | "savings";
 
-type Card = {
+type CardSpec = {
   label: string;
   value: string;
   sub: string;
-  trend: Trend;
-  delta: string;
+  delta: number | null;
+  deltaSuffix: string;
   icon: React.ElementType;
-  tone: "neutral" | "expense" | "income" | "savings";
+  tone: Tone;
 };
 
-const CARDS: Card[] = [
-  {
-    label: "Net this month",
-    value: "+₹2,400",
-    sub: "Income minus spend",
-    trend: "up",
-    delta: "12%",
-    icon: Wallet,
-    tone: "neutral",
-  },
-  {
-    label: "Spent",
-    value: "₹1,850",
-    sub: "Across 14 transactions",
-    trend: "down",
-    delta: "5%",
-    icon: TrendingDown,
-    tone: "expense",
-  },
-  {
-    label: "Income",
-    value: "₹4,250",
-    sub: "From 2 sources",
-    trend: "up",
-    delta: "3%",
-    icon: TrendingUp,
-    tone: "income",
-  },
-  {
-    label: "Savings rate",
-    value: "56%",
-    sub: "Of income kept",
-    trend: "up",
-    delta: "8%",
-    icon: PiggyBank,
-    tone: "savings",
-  },
-];
-
-function trendStyles(trend: Trend, tone: Card["tone"]) {
-  // For "Spent": a *decrease* (trend down) is actually good news; flip the semantic.
-  const positive = tone === "expense" ? trend === "down" : trend === "up";
-  if (trend === "flat") return "text-muted-foreground";
-  return positive ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400";
+function formatRupees(n: number, opts?: { signed?: boolean }): string {
+  const abs = Math.abs(n);
+  const body = `₹${new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0,
+  }).format(Math.round(abs))}`;
+  if (!opts?.signed) return body;
+  if (n > 0) return `+${body}`;
+  if (n < 0) return `−${body}`;
+  return body;
 }
 
-export function DashboardSummaryCards() {
+function formatPct(n: number): string {
+  return `${Math.round(n)}%`;
+}
+
+function deltaTrend(delta: number | null): "up" | "down" | "flat" {
+  if (delta === null || Math.abs(delta) < 0.5) return "flat";
+  return delta > 0 ? "up" : "down";
+}
+
+function deltaStyles(trend: "up" | "down" | "flat", tone: Tone): string {
+  if (trend === "flat") return "text-muted-foreground";
+  // For "Spent": a *decrease* (down) is positive news; invert.
+  const positive = tone === "expense" ? trend === "down" : trend === "up";
+  return positive
+    ? "text-emerald-500 dark:text-emerald-400"
+    : "text-rose-500 dark:text-rose-400";
+}
+
+export function DashboardSummaryCards({
+  summary,
+}: {
+  summary: MonthlySummary;
+}) {
+  const cards: CardSpec[] = [
+    {
+      label: "Net this month",
+      value: formatRupees(summary.net, { signed: true }),
+      sub: "Income minus spend",
+      delta: summary.deltas.net,
+      deltaSuffix: "%",
+      icon: Wallet,
+      tone: "neutral",
+    },
+    {
+      label: "Spent",
+      value: formatRupees(summary.spent),
+      sub:
+        summary.expenseCount === 0
+          ? "No expenses yet"
+          : `Across ${summary.expenseCount} transaction${summary.expenseCount === 1 ? "" : "s"}`,
+      delta: summary.deltas.spent,
+      deltaSuffix: "%",
+      icon: TrendingDown,
+      tone: "expense",
+    },
+    {
+      label: "Income",
+      value: formatRupees(summary.income),
+      sub:
+        summary.incomeSourceCount === 0
+          ? "No income yet"
+          : `From ${summary.incomeSourceCount} source${summary.incomeSourceCount === 1 ? "" : "s"}`,
+      delta: summary.deltas.income,
+      deltaSuffix: "%",
+      icon: TrendingUp,
+      tone: "income",
+    },
+    {
+      label: "Savings rate",
+      value: summary.income > 0 ? formatPct(summary.savingsRate) : "—",
+      sub: summary.income > 0 ? "Of income kept" : "Add income to compute",
+      delta: summary.deltas.savingsRatePoints,
+      deltaSuffix: "pp",
+      icon: PiggyBank,
+      tone: "savings",
+    },
+  ];
+
   return (
     <section
       aria-label="Monthly summary"
       className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4"
     >
-      {CARDS.map((c) => {
+      {cards.map((c) => {
         const Icon = c.icon;
-        const Arrow = c.trend === "up" ? ArrowUpRight : ArrowDownRight;
-        const tStyle = trendStyles(c.trend, c.tone);
+        const trend = deltaTrend(c.delta);
+        const tStyle = deltaStyles(trend, c.tone);
+        const Arrow =
+          trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
+        const deltaText =
+          c.delta === null
+            ? "—"
+            : `${Math.abs(Math.round(c.delta))}${c.deltaSuffix}`;
         return (
           <div
             key={c.label}
@@ -95,9 +142,14 @@ export function DashboardSummaryCards() {
               </span>
               <span
                 className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${tStyle}`}
+                aria-label={
+                  c.delta === null
+                    ? "No prior month data"
+                    : `${deltaText} vs last month`
+                }
               >
                 <Arrow className="h-3 w-3" strokeWidth={2.5} />
-                {c.delta}
+                {deltaText}
               </span>
             </div>
           </div>

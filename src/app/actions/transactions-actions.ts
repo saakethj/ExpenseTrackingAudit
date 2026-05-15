@@ -155,3 +155,125 @@ export async function listRecentTransactions(
   if (error) return [];
   return (data ?? []) as RecentTransaction[];
 }
+
+export type MonthlySummary = {
+  spent: number;
+  income: number;
+  net: number;
+  savingsRate: number;
+  expenseCount: number;
+  incomeSourceCount: number;
+  deltas: {
+    spent: number | null;
+    income: number | null;
+    net: number | null;
+    savingsRatePoints: number | null;
+  };
+  categories: { label: string; amount: number }[];
+  monthLabel: string;
+};
+
+function toIsoDate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export async function getMonthlySummary(): Promise<MonthlySummary> {
+  const now = new Date();
+  const startOfThis = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const startOfNext = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const monthLabel = startOfThis.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  const empty: MonthlySummary = {
+    spent: 0,
+    income: 0,
+    net: 0,
+    savingsRate: 0,
+    expenseCount: 0,
+    incomeSourceCount: 0,
+    deltas: { spent: null, income: null, net: null, savingsRatePoints: null },
+    categories: [],
+    monthLabel,
+  };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return empty;
+
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("type, amount, category, date")
+    .eq("user_id", user.id)
+    .gte("date", toIsoDate(startOfPrev))
+    .lt("date", toIsoDate(startOfNext));
+
+  if (error || !data) return empty;
+
+  const thisStart = toIsoDate(startOfThis);
+  let spent = 0;
+  let income = 0;
+  let expenseCount = 0;
+  let prevSpent = 0;
+  let prevIncome = 0;
+  const categoryMap = new Map<string, number>();
+  const incomeSources = new Set<string>();
+
+  for (const row of data) {
+    const amt = Number(row.amount);
+    if (!Number.isFinite(amt)) continue;
+    const inThis = row.date >= thisStart;
+    if (inThis) {
+      if (row.type === "expense") {
+        spent += amt;
+        expenseCount += 1;
+        categoryMap.set(row.category, (categoryMap.get(row.category) ?? 0) + amt);
+      } else if (row.type === "income") {
+        income += amt;
+        incomeSources.add(row.category);
+      }
+    } else {
+      if (row.type === "expense") prevSpent += amt;
+      else if (row.type === "income") prevIncome += amt;
+    }
+  }
+
+  const net = income - spent;
+  const prevNet = prevIncome - prevSpent;
+  const savingsRate = income > 0 ? (net / income) * 100 : 0;
+  const prevSavingsRate = prevIncome > 0 ? (prevNet / prevIncome) * 100 : null;
+
+  const pctChange = (curr: number, prev: number): number | null => {
+    if (prev === 0) return null;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+  };
+
+  const categories = [...categoryMap.entries()]
+    .map(([label, amount]) => ({ label, amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return {
+    spent,
+    income,
+    net,
+    savingsRate,
+    expenseCount,
+    incomeSourceCount: incomeSources.size,
+    deltas: {
+      spent: pctChange(spent, prevSpent),
+      income: pctChange(income, prevIncome),
+      net: pctChange(net, prevNet),
+      savingsRatePoints:
+        prevSavingsRate === null ? null : savingsRate - prevSavingsRate,
+    },
+    categories,
+    monthLabel,
+  };
+}

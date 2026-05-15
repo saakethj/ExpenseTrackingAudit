@@ -2,9 +2,9 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅
 >
-> **Next:** CSV import → wire summary cards + category breakdown to real DB aggregates
+> **Next:** CSV import (two-step modal: upload + auto-detect → column mapping → commit)
 
 ---
 
@@ -52,7 +52,7 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 | `/login` | ✅ | Sign in (Google + email/password) |
 | `/signup` | ✅ | Create account (Google + email/password, confirmation required) |
 | `/auth/callback` | ✅ | OAuth + email-confirm code exchange (no UI) |
-| `/dashboard` | ✅ | Greeting + glass date card, "Manage your money" quick actions, summary cards (mock), live Recent Transactions list with row-level edit + delete, category breakdown (mock). Add / Edit / Delete all write live to Supabase. |
+| `/dashboard` | ✅ | Greeting + glass date card, "Manage your money" quick actions, live summary cards (Net / Spent / Income / Savings rate with month-over-month deltas), live Recent Transactions list with row-level edit + delete, live category breakdown (top 5 + "Other"). Add / Edit / Delete all write live to Supabase. |
 | `/dashboard/profile` | ✅ | User profile with 5 working sections: General, Preferences, Categories, Appearance, Notifications |
 | `/dashboard/transactions` | ⏳ | Full transaction list with filters (next phase) |
 | `/dashboard/budgets` | 📋 | Budget tracking (Phase 2) |
@@ -84,7 +84,7 @@ src/
 │   │   │       ├── preferences-actions.ts
 │   │   │       └── categories-actions.ts
 │   ├── actions/
-│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions (whitelist validation, RLS + user_id-scoped for defense-in-depth)
+│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / getMonthlySummary (whitelist validation, RLS + user_id-scoped for defense-in-depth)
 │   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill + density/font-scale overrides
 │   ├── layout.tsx            Root layout (Inter font, ThemeProvider, DensityProvider)
 │   └── page.tsx              Landing page
@@ -104,10 +104,10 @@ src/
 │   ├── profile-shell.tsx     Profile sidebar nav + content switcher
 │   ├── dashboard-actions.tsx Quick-actions section (Add Transaction + Import CSV placeholder) — owns modal + toast
 │   ├── add-transaction-modal.tsx     Shared modal: `mode: "create" | "edit"` with optional `initialValues` + `transactionId`. Portaled to `document.body` so it overlays the entire viewport; trash icon → inline confirm → delete
-│   ├── dashboard-summary-cards.tsx       4 KPI cards (mock data — DB wiring pending)
+│   ├── dashboard-summary-cards.tsx       4 KPI cards (Net / Spent / Income / Savings rate) fed by `getMonthlySummary` — real values, signed Net, month-over-month deltas (% for amounts, pp for savings rate), `—` when no prior-month data
 │   ├── dashboard-recent-transactions.tsx Server: fetches last 5 rows via `listRecentTransactions`, renders the shell + empty state
 │   ├── dashboard-recent-transactions-list.tsx Client: clickable rows with always-visible pencil icon, opens edit modal, save/delete toast
-│   └── dashboard-category-breakdown.tsx  Horizontal bars by category (mock — DB wiring pending)
+│   └── dashboard-category-breakdown.tsx  Horizontal bars by category — top 5 + "Other" rollup, icon fallback to Receipt, empty state when no expenses
 ├── lib/supabase/
 │   ├── client.ts             Browser client (for Client Components)
 │   ├── server.ts             Server client (for Server Components / Server Actions)
@@ -213,8 +213,8 @@ npx tsc --noEmit     # type-check
 - [x] Add Transaction — modal with validation, server action with whitelist + RLS, success toast, `transactions` table
 - [x] Recent Transactions wired to live DB rows (last 5, ordered by date)
 - [x] Row-level edit + delete on Recent Transactions — same modal in `edit` mode, inline delete confirm, RLS + user_id-scoped server actions
+- [x] Summary cards + category breakdown wired to real DB aggregates via `getMonthlySummary` (single query, month-over-month deltas)
 - [ ] CSV import (two-step modal: upload + auto-detect → column mapping → commit)
-- [ ] Wire summary cards / category breakdown to real DB aggregates
 - [ ] Full `/dashboard/transactions` list with category + date-range + type filters
 
 **Phase 2: Insights** (after MVP is stable)

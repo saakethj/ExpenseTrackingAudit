@@ -6,13 +6,14 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 
 ## Status
 
-**✅ Complete:** Auth (email/password + Google OAuth), Dashboard shell, User profile system, Dashboard home UI, full Add / Edit / Delete Transaction flow (DB-wired), Recent Transactions wired to live DB rows
+**✅ Complete:** Auth (email/password + Google OAuth), Dashboard shell, User profile system, Dashboard home UI, full Add / Edit / Delete Transaction flow (DB-wired), Recent Transactions wired to live DB rows, summary cards + category breakdown wired to live DB aggregates
 - Profile sections: General, Preferences, Categories, Appearance, Notifications — all functional
 - Appearance system: density (comfortable/compact), font scale (normal/large), accent colors (5 presets), reduced motion toggle
-- Dashboard home: greeting + glass date card, "Manage your money" quick-actions section, summary cards (mock), live Recent Transactions list, category breakdown (mock)
+- Dashboard home: greeting + glass date card, "Manage your money" quick-actions section, live summary cards, live Recent Transactions list, live category breakdown
 - Transactions: shared modal supports `mode: "create" | "edit"` with optional `initialValues` + `transactionId`. Portaled to `document.body` so it overlays the entire viewport regardless of parent stacking context. Server actions are RLS-gated *and* user_id-scoped in WHERE clauses for defense-in-depth. Rows show an always-visible pencil pill (purple-tints on hover) as the edit affordance; trash icon inside the modal opens an inline confirm before delete.
+- Dashboard aggregates: single `getMonthlySummary()` query fetches current + previous month rows, aggregates in JS, feeds both summary cards and category breakdown from one round trip. Deltas: `%` for amounts, `pp` (percentage points) for savings rate. Null deltas render `—` instead of division-by-zero noise. Spent-card delta arrow inverts (down = green, up = red). Category breakdown rolls categories past top 5 into an "Other" row.
 
-**⏳ Next:** Wire summary cards + category breakdown to real DB aggregates, then CSV import
+**⏳ Next:** CSV import (two-step modal: upload + auto-detect → column mapping → commit)
 
 **📋 Later:** Full `/dashboard/transactions` list page with filters, charts, budgets, billing, role-based access
 
@@ -21,8 +22,9 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 **Current refactor (dashboard data flow):**
 1. ✅ Dashboard UI shell + Add Transaction (modal + server action + toast + RLS)
 2. ✅ Recent Transactions wired to live DB rows + row-level edit + delete (shared modal in edit mode, inline delete confirm, `updateTransaction` / `deleteTransaction` server actions)
-3. 📋 Wire summary cards + category breakdown to real DB aggregates
+3. ✅ Summary cards + category breakdown wired to live DB aggregates (`getMonthlySummary` — single query, MoM deltas, null-safe)
 4. 📋 CSV import — two-step modal: upload + column auto-detect/preview → user maps columns + bulk-assigns category → commit
+5. 📋 Full `/dashboard/transactions` list page with filters (category, date range, type) — reuses the same row + modal
 
 **Phase 2: Insights**
 - Spending charts (line over time, pie by category)
@@ -80,7 +82,7 @@ src/
 │   │       ├── preferences-actions.ts    Save language + currency preferences
 │   │       └── categories-actions.ts     CRUD operations on categories table
 │   ├── actions/
-│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions. All RLS-gated; mutating actions are additionally scoped by user_id in WHERE clauses (defense-in-depth) and call `revalidatePath("/dashboard")`
+│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / getMonthlySummary. All RLS-gated; mutating actions are additionally scoped by user_id in WHERE clauses (defense-in-depth) and call `revalidatePath("/dashboard")`. `getMonthlySummary` returns `{ spent, income, net, savingsRate, expenseCount, incomeSourceCount, deltas, categories, monthLabel }` from a single query covering current + previous month.
 │   ├── globals.css           Tailwind v4 @theme + CSS vars + glow utilities + .glass-pill + density/font-scale/accent overrides
 │   ├── layout.tsx            Root: Inter font + ThemeProvider + DensityProvider
 │   └── page.tsx              Landing page
@@ -100,10 +102,10 @@ src/
 │   ├── profile-shell.tsx     Profile sidebar nav + content area switcher
 │   ├── dashboard-actions.tsx Quick-actions section: heading + Add Transaction (solid purple) + Import CSV (disabled "Soon")
 │   ├── add-transaction-modal.tsx  Shared modal — `mode: "create" | "edit"`, optional `transactionId` + `initialValues`, optional `onDeleted`. Portaled to `document.body` so it overlays the entire viewport. Inline delete-confirm in the footer (no second modal). Calls `addTransaction` / `updateTransaction` / `deleteTransaction`
-│   ├── dashboard-summary-cards.tsx     4 KPI cards: Net / Spent / Income / Savings Rate (mock data — to be DB-wired)
+│   ├── dashboard-summary-cards.tsx     4 KPI cards: Net / Spent / Income / Savings rate — takes `summary: MonthlySummary` prop, renders signed Net, MoM deltas (% for amounts, pp for savings rate, `—` when null), Spent delta arrow inverts (down = good)
 │   ├── dashboard-recent-transactions.tsx  Server component: fetches last 5 rows via `listRecentTransactions`, renders the shell + empty state, delegates list to client child
 │   ├── dashboard-recent-transactions-list.tsx  Client: clickable rows with always-visible pencil icon, opens shared modal in edit mode, save/delete toast
-│   └── dashboard-category-breakdown.tsx   Horizontal bars by category (mock — to be DB-wired)
+│   └── dashboard-category-breakdown.tsx   Horizontal bars by category — takes `summary: MonthlySummary` prop, top 5 categories + "Other" rollup, icon fallback to Receipt, friendly empty state when no expenses
 ├── lib/
 │   └── supabase/
 │       ├── client.ts         Browser client (Client Components)

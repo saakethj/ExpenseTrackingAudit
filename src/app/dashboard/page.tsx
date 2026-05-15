@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMonthlySummary } from "@/app/actions/transactions-actions";
 import { DashboardSummaryCards } from "@/components/dashboard-summary-cards";
 import { DashboardRecentTransactions } from "@/components/dashboard-recent-transactions";
 import { DashboardCategoryBreakdown } from "@/components/dashboard-category-breakdown";
@@ -29,6 +30,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  const summary = await getMonthlySummary();
   const firstName = getFirstName(user.user_metadata ?? {}, user.email);
   const now = new Date();
   const greeting = getGreeting(now.getHours());
@@ -121,14 +123,14 @@ export default async function DashboardPage() {
 
         <DashboardActions />
 
-        <DashboardSummaryCards />
+        <DashboardSummaryCards summary={summary} />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           <div className="lg:col-span-2">
             <DashboardRecentTransactions />
           </div>
           <div className="lg:col-span-1">
-            <DashboardCategoryBreakdown />
+            <DashboardCategoryBreakdown summary={summary} />
           </div>
         </div>
       </div>
