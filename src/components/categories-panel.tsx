@@ -39,10 +39,12 @@ function CategoryModal({
   mode,
   onClose,
   onDone,
+  nextSortOrder,
 }: {
   mode: ModalMode;
   onClose: () => void;
   onDone: (cat: Category) => void;
+  nextSortOrder?: number;
 }) {
   const isEdit = mode.type === "edit";
   const [name, setName] = React.useState(isEdit ? mode.category.name : "");
@@ -70,9 +72,10 @@ function CategoryModal({
       if (res.error) { setError(res.error); setSaving(false); return; }
       onDone({ ...mode.category, name: name.trim(), color, icon });
     } else {
-      const res = await createCategoryAction({ name: name.trim(), color, icon, sort_order: Date.now() });
+      const sortOrder = nextSortOrder ?? 0;
+      const res = await createCategoryAction({ name: name.trim(), color, icon, sort_order: sortOrder });
       if (res.error || !res.id) { setError(res.error ?? "Failed to create."); setSaving(false); return; }
-      onDone({ id: res.id, name: name.trim(), color, icon, sort_order: Date.now() });
+      onDone({ id: res.id, name: name.trim(), color, icon, sort_order: sortOrder });
     }
     router.refresh();
   }
@@ -343,6 +346,7 @@ export function CategoriesPanel({ initialCategories }: CategoriesPanelProps) {
             mode={modalMode}
             onClose={() => setModalMode(null)}
             onDone={handleModalDone}
+            nextSortOrder={categories.length}
           />
         )}
       </AnimatePresence>
