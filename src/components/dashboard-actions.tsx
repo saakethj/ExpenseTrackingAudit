@@ -76,7 +76,7 @@ export function DashboardActions() {
       <AddTransactionModal
         open={open}
         onClose={() => setOpen(false)}
-        onSaved={(info) => setToast(info)}
+        onSaved={({ type, amount }) => setToast({ type, amount })}
       />
 
       {typeof window !== "undefined" &&

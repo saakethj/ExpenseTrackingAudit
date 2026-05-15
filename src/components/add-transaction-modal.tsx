@@ -3,8 +3,8 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Banknote, CreditCard, Smartphone, Building2, MoreHorizontal, ChevronDown, Check, Loader2 } from "lucide-react";
-import { addTransaction } from "@/app/actions/transactions-actions";
+import { X, Banknote, CreditCard, Smartphone, Building2, MoreHorizontal, ChevronDown, Check, Loader2, Trash2 } from "lucide-react";
+import { addTransaction, updateTransaction, deleteTransaction } from "@/app/actions/transactions-actions";
 
 type TxType = "expense" | "income";
 type PaymentMode = "cash" | "card" | "upi" | "bank" | "other";
@@ -26,9 +26,34 @@ function todayISO(): string {
 
 type DropdownPos = { top: number; left: number; width: number };
 
-type Props = { open: boolean; onClose: () => void; onSaved?: (info: { type: TxType; amount: number }) => void };
+export type TransactionInitialValues = {
+  type: TxType;
+  amount: number;
+  category: string;
+  payment_mode: PaymentMode;
+  date: string;
+  note: string | null;
+};
 
-export function AddTransactionModal({ open, onClose, onSaved }: Props) {
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  mode?: "create" | "edit";
+  transactionId?: string;
+  initialValues?: TransactionInitialValues;
+  onSaved?: (info: { type: TxType; amount: number; mode: "create" | "edit" }) => void;
+  onDeleted?: (info: { id: string }) => void;
+};
+
+export function AddTransactionModal({
+  open,
+  onClose,
+  mode = "create",
+  transactionId,
+  initialValues,
+  onSaved,
+  onDeleted,
+}: Props) {
   const [type, setType]               = React.useState<TxType>("expense");
   const [amount, setAmount]           = React.useState("");
   const [category, setCategory]       = React.useState("");
@@ -38,13 +63,46 @@ export function AddTransactionModal({ open, onClose, onSaved }: Props) {
   const [date, setDate]               = React.useState(todayISO());
   const [note, setNote]               = React.useState("");
   const [submitting, setSubmitting]   = React.useState(false);
+  const [deleting, setDeleting]       = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [categoryError, setCategoryError] = React.useState(false);
+
+  const isEdit = mode === "edit";
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (isEdit && initialValues) {
+      setType(initialValues.type);
+      setAmount(String(initialValues.amount));
+      setCategory(initialValues.category);
+      setPaymentMode(initialValues.payment_mode);
+      setDate(initialValues.date);
+      setNote(initialValues.note ?? "");
+      setSubmitError(null);
+      setCategoryError(false);
+      setConfirmDelete(false);
+    }
+  }, [open, isEdit, initialValues]);
 
   const categoryBtnRef = React.useRef<HTMLButtonElement>(null);
   const categories = type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
 
-  React.useEffect(() => { setCategory(""); setCategoryOpen(false); }, [type]);
+  const initialCategoryRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (isEdit && initialValues && initialCategoryRef.current === null) {
+      initialCategoryRef.current = initialValues.category;
+      return;
+    }
+    setCategory("");
+    setCategoryOpen(false);
+  }, [type, isEdit, initialValues]);
+
+  React.useEffect(() => {
+    if (!open) initialCategoryRef.current = null;
+  }, [open]);
 
   // close dropdown on outside click
   React.useEffect(() => {
@@ -99,6 +157,7 @@ export function AddTransactionModal({ open, onClose, onSaved }: Props) {
     setNote("");
     setSubmitError(null);
     setCategoryError(false);
+    setConfirmDelete(false);
   }
 
   function handleClose() { reset(); onClose(); }
@@ -110,32 +169,51 @@ export function AddTransactionModal({ open, onClose, onSaved }: Props) {
     setCategoryError(false);
     setSubmitting(true);
     setSubmitError(null);
-    const result = await addTransaction({
+    const payload = {
       type,
       amount: parseFloat(amount),
       category,
       payment_mode: paymentMode,
       date,
       note: note || undefined,
-    });
+    };
+    const result = isEdit && transactionId
+      ? await updateTransaction(transactionId, payload)
+      : await addTransaction(payload);
     setSubmitting(false);
     if ("error" in result) {
       setSubmitError(result.error);
       return;
     }
-    const savedInfo = { type, amount: parseFloat(amount) };
+    const savedInfo = { type, amount: parseFloat(amount), mode: isEdit ? ("edit" as const) : ("create" as const) };
     reset();
     onClose();
     onSaved?.(savedInfo);
   }
 
-  return (
-    <>
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              key="backdrop"
+  async function handleDelete() {
+    if (!isEdit || !transactionId) return;
+    setDeleting(true);
+    setSubmitError(null);
+    const result = await deleteTransaction(transactionId);
+    setDeleting(false);
+    if ("error" in result) {
+      setSubmitError(result.error);
+      setConfirmDelete(false);
+      return;
+    }
+    const id = transactionId;
+    reset();
+    onClose();
+    onDeleted?.({ id });
+  }
+
+  const modalTree = (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -151,17 +229,17 @@ export function AddTransactionModal({ open, onClose, onSaved }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 10 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed inset-x-0 bottom-0 top-20 z-50 flex items-center justify-center p-4 sm:p-6"
+              className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-20 sm:p-6 sm:pt-24"
               role="dialog"
               aria-modal
-              aria-label="Add transaction"
+              aria-label={isEdit ? "Edit transaction" : "Add transaction"}
             >
-              <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-xl">
+              <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-xl">
                 <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
                   {/* header */}
                   <div className="relative flex shrink-0 items-center justify-center border-b border-border px-6 py-4">
                     <h2 className="text-base font-semibold text-foreground/80">
-                      New Transaction
+                      {isEdit ? "Edit Transaction" : "New Transaction"}
                     </h2>
                     <button
                       type="button"
@@ -313,31 +391,80 @@ export function AddTransactionModal({ open, onClose, onSaved }: Props) {
                         {submitError}
                       </p>
                     )}
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={handleClose}
-                        disabled={submitting}
-                        className="flex-1 rounded-xl border border-border bg-muted/40 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:-translate-y-[1px] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:hover:translate-y-0"
-                        style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--purple) 80%, black) 0%, var(--purple) 100%)" }}
-                      >
-                        {submitting ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                            Saving…
-                          </>
-                        ) : (
-                          "Add Transaction →"
+                    {isEdit && confirmDelete ? (
+                      <div className="flex flex-col gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3">
+                        <p className="text-[12px] font-medium text-rose-500 dark:text-rose-400">
+                          Delete this transaction? This cannot be undone.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(false)}
+                            disabled={deleting}
+                            className="flex-1 rounded-lg border border-border bg-card/60 py-2 text-[12px] font-semibold text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                          >
+                            Keep
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-rose-500 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-60"
+                          >
+                            {deleting ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                                Deleting…
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+                                Delete
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3">
+                        {isEdit && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(true)}
+                            disabled={submitting || deleting}
+                            aria-label="Delete transaction"
+                            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" strokeWidth={2.25} />
+                          </button>
                         )}
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={handleClose}
+                          disabled={submitting}
+                          className="flex-1 rounded-xl border border-border bg-muted/40 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:-translate-y-[1px] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:hover:translate-y-0"
+                          style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--purple) 80%, black) 0%, var(--purple) 100%)" }}
+                        >
+                          {submitting ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                              Saving…
+                            </>
+                          ) : isEdit ? (
+                            "Save Changes →"
+                          ) : (
+                            "Add Transaction →"
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </form>
               </div>
@@ -345,6 +472,11 @@ export function AddTransactionModal({ open, onClose, onSaved }: Props) {
           </>
         )}
       </AnimatePresence>
+  );
+
+  return (
+    <>
+      {mounted && createPortal(modalTree, document.body)}
 
       {/* category dropdown — portal so overflow:hidden on modal doesn't clip it */}
       {categoryOpen && typeof window !== "undefined" && createPortal(
