@@ -2,9 +2,9 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import (two-step modal: upload + auto-detect → column mapping → commit) ✅ | All-time Balance card + Cash flow breakdown ✅
 >
-> **Next:** CSV import (two-step modal: upload + auto-detect → column mapping → commit)
+> **Next:** Full `/dashboard/transactions` list with filters (category, date range, type)
 
 ---
 
@@ -84,7 +84,7 @@ src/
 │   │   │       ├── preferences-actions.ts
 │   │   │       └── categories-actions.ts
 │   ├── actions/
-│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / getMonthlySummary (whitelist validation, RLS + user_id-scoped for defense-in-depth)
+│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary. All whitelist validation, RLS-gated, user_id-scoped WHERE clauses for defense-in-depth. `getMonthlySummary` returns current + previous month stats plus all-time balance and metadata.
 │   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill + density/font-scale overrides
 │   ├── layout.tsx            Root layout (Inter font, ThemeProvider, DensityProvider)
 │   └── page.tsx              Landing page
@@ -102,9 +102,10 @@ src/
 │   ├── general-panel.tsx     User info (placeholder for avatar/name edit)
 │   ├── categories-panel.tsx  Category CRUD with animated modal
 │   ├── profile-shell.tsx     Profile sidebar nav + content switcher
-│   ├── dashboard-actions.tsx Quick-actions section (Add Transaction + Import CSV placeholder) — owns modal + toast
+│   ├── dashboard-actions.tsx Quick-actions section (Add Transaction + Import Statement buttons) — owns both modals + shared toast
 │   ├── add-transaction-modal.tsx     Shared modal: `mode: "create" | "edit"` with optional `initialValues` + `transactionId`. Portaled to `document.body` so it overlays the entire viewport; trash icon → inline confirm → delete
-│   ├── dashboard-summary-cards.tsx       4 KPI cards (Net / Spent / Income / Savings rate) fed by `getMonthlySummary` — real values, signed Net, month-over-month deltas (% for amounts, pp for savings rate), `—` when no prior-month data
+│   ├── import-modal.tsx              Two-step import modal: Step 1 file upload (CSV/XLSX, auto-detects headers via regex scan), column mapping with auto-detect; Step 2 row review with checkboxes, inline category dropdowns, bulk-assign, type toggle. Portaled. Calls `importTransactions` server action.
+│   ├── dashboard-summary-cards.tsx   Hero balance card (all-time income − spend, gradient text when positive, rose text when negative, smart subtitle) + 4 monthly KPI cards (Cash flow / Spent / Income / Savings rate) fed by `getMonthlySummary` — real values, signed, month-over-month deltas (% for amounts, pp for savings rate), `—` when no prior-month data
 │   ├── dashboard-recent-transactions.tsx Server: fetches last 5 rows via `listRecentTransactions`, renders the shell + empty state
 │   ├── dashboard-recent-transactions-list.tsx Client: clickable rows with always-visible pencil icon, opens edit modal, save/delete toast
 │   └── dashboard-category-breakdown.tsx  Horizontal bars by category — top 5 + "Other" rollup, icon fallback to Receipt, empty state when no expenses
@@ -205,7 +206,7 @@ npx tsc --noEmit     # type-check
 
 ## Roadmap (3 phases)
 
-**Phase 1: Dashboard MVP** (NOW)
+**Phase 1: Dashboard MVP** (COMPLETE)
 - [x] Auth UI + backend (email/password + Google OAuth, session middleware)
 - [x] Dashboard shell (responsive navbar, sign-out, ETM brand)
 - [x] User profile system (General, Preferences, Categories, Appearance, Notifications sections)
@@ -214,7 +215,8 @@ npx tsc --noEmit     # type-check
 - [x] Recent Transactions wired to live DB rows (last 5, ordered by date)
 - [x] Row-level edit + delete on Recent Transactions — same modal in `edit` mode, inline delete confirm, RLS + user_id-scoped server actions
 - [x] Summary cards + category breakdown wired to real DB aggregates via `getMonthlySummary` (single query, month-over-month deltas)
-- [ ] CSV import (two-step modal: upload + auto-detect → column mapping → commit)
+- [x] CSV/XLSX import (two-step modal: upload + auto-detect columns → column mapping → row review + categorize → commit). Supports bank formats with metadata preamble, auto-detects headers, keyword-based category suggestions, batch insert via server action with RLS
+- [x] All-time Balance card (hero section showing total income − spend across all transactions, with smart subtitle for edge cases). Renamed "Net this month" → "Cash flow" to clarify it's a flow, not net worth
 - [ ] Full `/dashboard/transactions` list with category + date-range + type filters
 
 **Phase 2: Insights** (after MVP is stable)

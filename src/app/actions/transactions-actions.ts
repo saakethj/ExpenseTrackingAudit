@@ -124,6 +124,46 @@ export async function deleteTransaction(
   return { ok: true };
 }
 
+export async function importTransactions(
+  rows: AddTransactionInput[]
+): Promise<{ ok: true; count: number } | { error: string }> {
+  if (!rows || rows.length === 0) return { error: "No rows to import." };
+  if (rows.length > 1000) return { error: "Too many rows. Maximum 1000 per import." };
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (!VALID_TYPES.has(r.type)) return { error: `Row ${i + 1}: invalid transaction type.` };
+    if (!VALID_MODES.has(r.payment_mode)) return { error: `Row ${i + 1}: invalid payment mode.` };
+    if (!r.amount || r.amount <= 0) return { error: `Row ${i + 1}: amount must be greater than zero.` };
+    if (!r.category?.trim()) return { error: `Row ${i + 1}: category is required.` };
+    if (!r.date) return { error: `Row ${i + 1}: date is required.` };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "You must be signed in to import transactions." };
+
+  const { error } = await supabase.from("transactions").insert(
+    rows.map((r) => ({
+      user_id: user.id,
+      type: r.type,
+      amount: r.amount,
+      category: r.category.trim(),
+      payment_mode: r.payment_mode,
+      date: r.date,
+      note: r.note?.trim() || null,
+    }))
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  return { ok: true, count: rows.length };
+}
+
 export type RecentTransaction = {
   id: string;
   type: TransactionType;
@@ -171,6 +211,9 @@ export type MonthlySummary = {
   };
   categories: { label: string; amount: number }[];
   monthLabel: string;
+  balance: number;
+  totalTransactions: number;
+  firstTransactionDate: string | null;
 };
 
 function toIsoDate(d: Date): string {
@@ -200,6 +243,9 @@ export async function getMonthlySummary(): Promise<MonthlySummary> {
     deltas: { spent: null, income: null, net: null, savingsRatePoints: null },
     categories: [],
     monthLabel,
+    balance: 0,
+    totalTransactions: 0,
+    firstTransactionDate: null,
   };
 
   const supabase = await createClient();
@@ -211,25 +257,35 @@ export async function getMonthlySummary(): Promise<MonthlySummary> {
   const { data, error } = await supabase
     .from("transactions")
     .select("type, amount, category, date")
-    .eq("user_id", user.id)
-    .gte("date", toIsoDate(startOfPrev))
-    .lt("date", toIsoDate(startOfNext));
+    .eq("user_id", user.id);
 
   if (error || !data) return empty;
 
   const thisStart = toIsoDate(startOfThis);
+  const prevStart = toIsoDate(startOfPrev);
+  const nextStart = toIsoDate(startOfNext);
   let spent = 0;
   let income = 0;
   let expenseCount = 0;
   let prevSpent = 0;
   let prevIncome = 0;
+  let allIncome = 0;
+  let allSpent = 0;
+  let firstDate: string | null = null;
   const categoryMap = new Map<string, number>();
   const incomeSources = new Set<string>();
 
   for (const row of data) {
     const amt = Number(row.amount);
     if (!Number.isFinite(amt)) continue;
-    const inThis = row.date >= thisStart;
+
+    if (row.type === "expense") allSpent += amt;
+    else if (row.type === "income") allIncome += amt;
+    if (!firstDate || row.date < firstDate) firstDate = row.date;
+
+    const inThis = row.date >= thisStart && row.date < nextStart;
+    const inPrev = row.date >= prevStart && row.date < thisStart;
+
     if (inThis) {
       if (row.type === "expense") {
         spent += amt;
@@ -239,7 +295,7 @@ export async function getMonthlySummary(): Promise<MonthlySummary> {
         income += amt;
         incomeSources.add(row.category);
       }
-    } else {
+    } else if (inPrev) {
       if (row.type === "expense") prevSpent += amt;
       else if (row.type === "income") prevIncome += amt;
     }
@@ -275,5 +331,8 @@ export async function getMonthlySummary(): Promise<MonthlySummary> {
     },
     categories,
     monthLabel,
+    balance: allIncome - allSpent,
+    totalTransactions: data.length,
+    firstTransactionDate: firstDate,
   };
 }

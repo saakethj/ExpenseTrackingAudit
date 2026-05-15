@@ -5,8 +5,11 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Upload, CheckCircle2 } from "lucide-react";
 import { AddTransactionModal } from "./add-transaction-modal";
+import { ImportModal } from "./import-modal";
 
-type ToastInfo = { type: "expense" | "income"; amount: number };
+type ToastInfo =
+  | { kind: "tx"; type: "expense" | "income"; amount: number }
+  | { kind: "import"; count: number };
 
 function formatAmount(n: number): string {
   return `₹${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n)}`;
@@ -14,6 +17,7 @@ function formatAmount(n: number): string {
 
 export function DashboardActions() {
   const [open, setOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
   const [toast, setToast] = React.useState<ToastInfo | null>(null);
 
   React.useEffect(() => {
@@ -60,23 +64,24 @@ export function DashboardActions() {
 
         <button
           type="button"
-          disabled
-          aria-disabled="true"
-          title="Coming soon"
-          className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-border bg-card/60 px-4 py-2 text-[13px] font-semibold text-muted-foreground backdrop-blur-xl sm:px-5 sm:py-2.5 sm:text-[14px]"
+          onClick={() => setImportOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-4 py-2 text-[13px] font-semibold text-foreground backdrop-blur-xl transition-all duration-200 hover:-translate-y-[1px] hover:border-purple/40 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-5 sm:py-2.5 sm:text-[14px]"
         >
           <Upload className="h-4 w-4" strokeWidth={2.25} />
-          <span>Import CSV</span>
-          <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:ml-1 sm:px-2 sm:text-[10px]">
-            Soon
-          </span>
+          <span>Import Statement</span>
         </button>
       </div>
 
       <AddTransactionModal
         open={open}
         onClose={() => setOpen(false)}
-        onSaved={({ type, amount }) => setToast({ type, amount })}
+        onSaved={({ type, amount }) => setToast({ kind: "tx", type, amount })}
+      />
+
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(count) => setToast({ kind: "import", count })}
       />
 
       {typeof window !== "undefined" &&
@@ -101,10 +106,14 @@ export function DashboardActions() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-foreground">
-                    {toast.type === "expense" ? "Expense" : "Income"} saved
+                    {toast.kind === "import"
+                      ? `Imported ${toast.count} transaction${toast.count === 1 ? "" : "s"}`
+                      : `${toast.type === "expense" ? "Expense" : "Income"} saved`}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    {formatAmount(toast.amount)} added to your records
+                    {toast.kind === "import"
+                      ? "Your dashboard has been updated"
+                      : `${formatAmount(toast.amount)} added to your records`}
                   </p>
                 </div>
               </motion.div>
