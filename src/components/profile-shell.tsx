@@ -23,6 +23,12 @@ import {
   PreferencesPanel,
   type PreferencesPanelProps,
 } from "@/components/preferences-panel";
+import { CategoriesPanel, type Category } from "@/components/categories-panel";
+import { AppearancePanel } from "@/components/appearance-panel";
+import {
+  NotificationsPanel,
+  type NotificationsPanelProps,
+} from "@/components/notifications-panel";
 
 type NavItem = { key: ProfileNavKey; label: string; icon: LucideIcon };
 type Section = { title: string; items: NavItem[] };
@@ -61,9 +67,13 @@ function sectionIndexForKey(key: ProfileNavKey): number {
   return SECTIONS.findIndex((s) => s.items.some((i) => i.key === key));
 }
 
-type Props = GeneralPanelProps & { preferences: PreferencesPanelProps };
+type Props = GeneralPanelProps & {
+  preferences: PreferencesPanelProps;
+  categories: Category[];
+  notifications: NotificationsPanelProps;
+};
 
-export function ProfileShell({ preferences, ...props }: Props) {
+export function ProfileShell({ preferences, categories, notifications, ...props }: Props) {
   const [active, setActive] = React.useState<ProfileNavKey>("general");
   const [openSection, setOpenSection] = React.useState<number>(-1);
 
@@ -206,7 +216,40 @@ export function ProfileShell({ preferences, ...props }: Props) {
               <PreferencesPanel {...preferences} />
             </motion.div>
           )}
-          {active !== "general" && active !== "preferences" && (
+          {active === "categories" && (
+            <motion.div
+              key="categories"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <CategoriesPanel initialCategories={categories} />
+            </motion.div>
+          )}
+          {active === "appearance" && (
+            <motion.div
+              key="appearance"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <AppearancePanel />
+            </motion.div>
+          )}
+          {active === "notifications" && (
+            <motion.div
+              key="notifications"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <NotificationsPanel {...notifications} />
+            </motion.div>
+          )}
+          {active !== "general" && active !== "preferences" && active !== "categories" && active !== "appearance" && active !== "notifications" && (
             <motion.div
               key={active}
               initial={{ opacity: 0, y: 8 }}

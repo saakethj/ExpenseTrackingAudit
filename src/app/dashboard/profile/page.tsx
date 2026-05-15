@@ -6,6 +6,20 @@ import { AccountSnapshot } from "@/components/account-snapshot";
 import { ProfileShell } from "@/components/profile-shell";
 import { createClient } from "@/lib/supabase/server";
 import { getAvatarSignedUrl } from "@/lib/supabase/avatar-server";
+import type { Category } from "@/components/categories-panel";
+
+const DEFAULT_CATEGORIES = [
+  { name: "Food & Dining", color: "#f97316", icon: "🍔", sort_order: 0 },
+  { name: "Transport",     color: "#3b82f6", icon: "🚗", sort_order: 1 },
+  { name: "Housing",       color: "#8b5cf6", icon: "🏠", sort_order: 2 },
+  { name: "Utilities",     color: "#eab308", icon: "💡", sort_order: 3 },
+  { name: "Shopping",      color: "#ec4899", icon: "🛍️", sort_order: 4 },
+  { name: "Entertainment", color: "#06b6d4", icon: "🎬", sort_order: 5 },
+  { name: "Health",        color: "#22c55e", icon: "💊", sort_order: 6 },
+  { name: "Education",     color: "#f59e0b", icon: "📚", sort_order: 7 },
+  { name: "Travel",        color: "#6366f1", icon: "✈️", sort_order: 8 },
+  { name: "Income",        color: "#10b981", icon: "💰", sort_order: 9 },
+];
 
 const DEFAULT_AVATAR = "/avatar-default.svg";
 
@@ -53,6 +67,14 @@ export default async function ProfilePage() {
   const prefFiscalYearStart =
     (meta.pref_fiscal_year_start as string | undefined) ?? "January";
 
+  const notifBudgetAlerts = (meta.notif_budget_alerts as boolean | undefined) ?? true;
+  const notifLargeTransactions = (meta.notif_large_transactions as boolean | undefined) ?? true;
+  const notifWeeklySummary = (meta.notif_weekly_summary as boolean | undefined) ?? false;
+  const notifMonthlyReport = (meta.notif_monthly_report as boolean | undefined) ?? true;
+  const notifLoginActivity = (meta.notif_login_activity as boolean | undefined) ?? true;
+  const notifProfileChanges = (meta.notif_profile_changes as boolean | undefined) ?? false;
+  const notifFrequency = (meta.notif_frequency as "realtime" | "daily" | "weekly" | undefined) ?? "realtime";
+
   const provider = (user.app_metadata?.provider as string | undefined) ?? "email";
   const hasPassword = (user.identities ?? []).some((id) => id.provider === "email");
 
@@ -62,6 +84,22 @@ export default async function ProfilePage() {
 
   const signedAvatarUrl = await getAvatarSignedUrl(user.id);
   const avatarUrl = signedAvatarUrl ?? DEFAULT_AVATAR;
+
+  // Fetch categories — seed defaults on first visit
+  const { data: existingCats } = await supabase
+    .from("categories")
+    .select("id, name, color, icon, sort_order")
+    .order("sort_order", { ascending: true });
+
+  let categories = (existingCats as Category[] | null) ?? [];
+
+  if (categories.length === 0) {
+    const { data: seeded } = await supabase
+      .from("categories")
+      .insert(DEFAULT_CATEGORIES.map((d) => ({ ...d, user_id: user.id })))
+      .select("id, name, color, icon, sort_order");
+    categories = (seeded as Category[] | null) ?? [];
+  }
 
   return (
     <div className="flex flex-1 justify-center px-3 py-8 sm:px-6 sm:py-12">
@@ -81,6 +119,16 @@ export default async function ProfilePage() {
             timezone: prefTimezone,
             weekStart: prefWeekStart,
             fiscalYearStart: prefFiscalYearStart,
+          }}
+          categories={categories}
+          notifications={{
+            budgetAlerts: notifBudgetAlerts,
+            largeTransactions: notifLargeTransactions,
+            weeklySummary: notifWeeklySummary,
+            monthlyReport: notifMonthlyReport,
+            loginActivity: notifLoginActivity,
+            profileChanges: notifProfileChanges,
+            frequency: notifFrequency,
           }}
         />
 
