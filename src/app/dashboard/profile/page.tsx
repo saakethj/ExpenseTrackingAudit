@@ -96,7 +96,10 @@ export default async function ProfilePage() {
   if (categories.length === 0) {
     const { data: seeded } = await supabase
       .from("categories")
-      .insert(DEFAULT_CATEGORIES.map((d) => ({ ...d, user_id: user.id })))
+      .upsert(
+        DEFAULT_CATEGORIES.map((d) => ({ ...d, user_id: user.id })),
+        { onConflict: "user_id,name", ignoreDuplicates: true }
+      )
       .select("id, name, color, icon, sort_order");
     categories = (seeded as Category[] | null) ?? [];
   }
