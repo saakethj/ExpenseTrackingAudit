@@ -2,7 +2,9 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth complete (email/password + Google via Supabase). Dashboard shell live — glass-pill navbar with responsive hamburger, placeholder pages pending.
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system (density, font scale, accent colors, reduced motion) ✅
+>
+> **Next:** Transaction list + quick-add form + summary cards (Phase 1: Dashboard MVP)
 
 ---
 
@@ -44,17 +46,18 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 
 ### Routes
 
-| Path | Description |
-|---|---|
-| `/` | Landing page |
-| `/login` | Sign in (Google + manual email/password) |
-| `/signup` | Create account (Google + manual email/password, confirmation required) |
-| `/auth/callback` | OAuth + email-confirm code exchange (no UI) |
-| `/dashboard` | Authenticated landing page (Welcome) |
-| `/dashboard/transactions` | Placeholder — not yet built |
-| `/dashboard/budgets` | Placeholder — not yet built |
-| `/dashboard/analytics` | Placeholder — not yet built |
-| `/dashboard/subscriptions` | Placeholder — not yet built |
+| Path | Status | Description |
+|---|---|---|
+| `/` | ✅ | Landing page |
+| `/login` | ✅ | Sign in (Google + email/password) |
+| `/signup` | ✅ | Create account (Google + email/password, confirmation required) |
+| `/auth/callback` | ✅ | OAuth + email-confirm code exchange (no UI) |
+| `/dashboard` | ✅ | Authenticated home (Welcome/summary — will show transactions + cards) |
+| `/dashboard/profile` | ✅ | User profile with 5 working sections: General, Preferences, Categories, Appearance, Notifications |
+| `/dashboard/transactions` | ⏳ | Transaction list view (Phase 1) |
+| `/dashboard/budgets` | 📋 | Budget tracking (Phase 2) |
+| `/dashboard/analytics` | 📋 | Charts & reports (Phase 2) |
+| `/dashboard/subscriptions` | 📋 | Subscription tracking (Phase 3) |
 
 ---
 
@@ -64,29 +67,44 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 src/
 ├── app/
 │   ├── (auth)/
-│   │   ├── layout.tsx        Shared auth shell
+│   │   ├── layout.tsx        Shared auth shell (logo, theme toggle, backdrop)
 │   │   ├── login/page.tsx
 │   │   └── signup/page.tsx
 │   ├── auth/
-│   │   └── callback/route.ts OAuth + email-confirm callback
+│   │   └── callback/route.ts OAuth + email-confirm callback → session cookie
 │   ├── dashboard/
-│   │   ├── layout.tsx        Dashboard shell (backdrop + sticky nav)
-│   │   └── page.tsx          Welcome
-│   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill
-│   ├── layout.tsx            Root layout + ThemeProvider
-│   └── page.tsx              Landing
+│   │   ├── layout.tsx        Dashboard shell (soft backdrop + sticky DashboardNav)
+│   │   ├── page.tsx          Home/Welcome (will show transactions + summary)
+│   │   ├── transactions/
+│   │   │   └── page.tsx      Transaction list (NOT YET BUILT)
+│   │   ├── profile/
+│   │   │   ├── page.tsx      User profile container (fetches user_metadata)
+│   │   │   └── (actions)     Server actions for profile operations
+│   │   │       ├── notifications-actions.ts
+│   │   │       ├── preferences-actions.ts
+│   │   │       └── categories-actions.ts
+│   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill + density/font-scale overrides
+│   ├── layout.tsx            Root layout (Inter font, ThemeProvider, DensityProvider)
+│   └── page.tsx              Landing page
 ├── components/
-│   ├── auth-card.tsx         Login + signup card (mode prop)
-│   ├── dashboard-nav.tsx     Responsive glass-pill navbar (5 items + hamburger)
-│   ├── google-button.tsx     Google OAuth (wired)
-│   ├── theme-provider.tsx
-│   ├── theme-toggle.tsx
-│   └── user-menu.tsx         User icon dropdown (signed-in email, profile, sign out)
+│   ├── auth-card.tsx         Login + signup card
+│   ├── dashboard-nav.tsx     Glass-pill navbar (ETM brand, 5 nav items, responsive hamburger)
+│   ├── google-button.tsx     Google OAuth button
+│   ├── theme-provider.tsx    next-themes wrapper
+│   ├── theme-toggle.tsx      Dark/Light toggle with icon animation
+│   ├── user-menu.tsx         User dropdown (email, profile link, sign out)
+│   ├── density-provider.tsx  Appearance context (density, font scale, accent, reduced motion)
+│   ├── appearance-panel.tsx  Accent colors (5 presets), density, font scale, motion toggle
+│   ├── notifications-panel.tsx  6 notification toggles + frequency picker
+│   ├── preferences-panel.tsx   Language, currency, timezone (placeholder)
+│   ├── general-panel.tsx     User info (placeholder for avatar/name edit)
+│   ├── categories-panel.tsx  Category CRUD with animated modal
+│   └── profile-shell.tsx     Profile sidebar nav + content switcher
 ├── lib/supabase/
-│   ├── client.ts             Browser client
-│   ├── server.ts             Server client
+│   ├── client.ts             Browser client (for Client Components)
+│   ├── server.ts             Server client (for Server Components / Server Actions)
 │   └── middleware.ts         Session-refresh helper
-└── middleware.ts             Runs the helper on every request
+└── middleware.ts             Runs session refresh on every request
 ```
 
 ---
@@ -126,6 +144,19 @@ Tailwind utilities (`text-purple`, `bg-card`, `border-border`, etc.) are wired t
 background: linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%);
 ```
 
+### Appearance system (user-customizable)
+
+Users can personalize the app via `/dashboard/profile` → Appearance section:
+
+| Setting | Options | Storage |
+|---|---|---|
+| **Accent Color** | Aurora (purple+orange), Ocean (blue+cyan), Forest (green+amber), Sunset (rose+orange), Mono (slate) | CSS vars + `localStorage` |
+| **Display Density** | Comfortable (spacious), Compact (tighter, more on screen) | `data-density` attribute |
+| **Text Size** | Normal (16px base), Large (18px base) | `data-font-scale` attribute |
+| **Reduce Motion** | On/Off | `data-reduced-motion` attribute |
+
+All settings persist to `localStorage` (keys: `etm-density`, `etm-font-scale`, `etm-accent`, `etm-reduced-motion`) and are applied via `DensityProvider` React Context. CSS variable overrides in `globals.css` support dark mode and accent preset switching seamlessly.
+
 ---
 
 ## Scripts
@@ -140,15 +171,30 @@ npx tsc --noEmit     # type-check
 
 ---
 
-## Roadmap
+## Roadmap (3 phases)
 
-- [x] Auth UI (login + signup, Google button, dark/light toggle)
-- [x] Auth backend (Supabase — email/password with confirmation, Google OAuth, session middleware)
-- [x] Dashboard shell (responsive glass-pill navbar, sign-out, ETM brand mark)
-- [ ] Transactions, Budgets, Analytics, Subscriptions pages
-- [ ] Profile page + user-menu redesign
-- [ ] Security hardening (see [`things_tbd_later.md`](things_tbd_later.md))
-- [ ] Multi-user roles & permissions
+**Phase 1: Dashboard MVP** (NOW)
+- [x] Auth UI + backend (email/password + Google OAuth, session middleware)
+- [x] Dashboard shell (responsive navbar, sign-out, ETM brand)
+- [x] User profile system (General, Preferences, Categories, Appearance, Notifications sections)
+- [ ] Transaction list view (date, category, amount, note) + quick-add form
+- [ ] Summary cards (income, expenses, net, by-category breakdown)
+- [ ] Category filter + date range picker
+- [ ] Home dashboard (shows summary cards + recent transactions)
+
+**Phase 2: Insights** (after MVP is stable)
+- [ ] Spending charts (line over time, pie by category)
+- [ ] Monthly/weekly reports
+- [ ] Budget tracking (spend vs limit)
+- [ ] Import/Export (CSV)
+- [ ] Analytics page
+
+**Phase 3: Account & Compliance** (later)
+- [ ] Privacy & Security section (data access, connected integrations)
+- [ ] Danger zone (delete account, export all data)
+- [ ] Billing page (plan, payment methods, invoices)
+- [ ] Role-based access (shared accounts, read-only members)
+- [ ] Subscriptions tracking
 
 ---
 

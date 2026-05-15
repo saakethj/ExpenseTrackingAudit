@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DensityProvider } from "@/components/density-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -12,6 +13,13 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ExpenseTracking Audit",
   description: "Secure, multi-user financial dashboard.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logo.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: { url: "/logo.png", sizes: "180x180" },
+  },
 };
 
 export default function RootLayout({
@@ -30,7 +38,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <DensityProvider>
+            {children}
+          </DensityProvider>
         </ThemeProvider>
       </body>
     </html>
