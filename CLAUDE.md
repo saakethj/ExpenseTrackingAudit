@@ -6,7 +6,7 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 
 ## Status
 
-**✅ Complete:** Auth (email/password + Google OAuth), Dashboard shell, User profile system, Dashboard home UI, full Add / Edit / Delete Transaction flow (DB-wired), Recent Transactions wired to live DB rows, summary cards + category breakdown wired to live DB aggregates, CSV/XLSX import, All-time Balance card, Danger Zone (delete by import batch + delete by date range)
+**✅ Complete:** Auth (email/password + Google OAuth), Dashboard shell, User profile system, Dashboard home UI, full Add / Edit / Delete Transaction flow (DB-wired), Recent Transactions wired to live DB rows, summary cards + category breakdown wired to live DB aggregates, CSV/XLSX import, All-time Balance card, Danger Zone (delete by import batch + delete by date range), Analytics hub
 - Profile sections: General, Preferences, Categories, Appearance, Notifications — all functional
 - Appearance system: density (comfortable/compact), font scale (normal/large), accent colors (5 presets), reduced motion toggle
 - Dashboard home: greeting + glass date card, "Manage your money" quick-actions section (Add Transaction + Import Statement buttons), live summary cards (hero Balance card + 4 monthly KPIs), live Recent Transactions list, live category breakdown
@@ -14,6 +14,7 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 - Transactions (import): two-step `ImportModal` — Step 1: file upload (CSV/XLSX), auto-detects headers via regex scan (handles preamble/metadata in bank statements), user maps columns via themed dropdowns; Step 2: row review with checkboxes, inline category dropdowns with keyword-based auto-suggestions, bulk-assign, type toggle (E↔I). Portaled, animates in/out. Calls `importTransactions(rows, fileName)` server action — creates an `import_batches` record first, then batch-inserts transactions tagged with `import_batch_id`.
 - Danger Zone (`danger-zone-panel.tsx`): two sections — "Delete by import": fetches all `import_batches` on mount, shows filename + date + transaction count in a `max-h-64` scrollable list, per-batch delete with confirmation modal (optimistic removal from list on success); "Delete by date": time-range bulk deletes (this month / last 6 months / all). Each section has independent state, confirmation modal, and error/success feedback.
 - Dashboard aggregates: `getMonthlySummary()` fetches **all user rows** (no date filter), aggregates in JS — computes current month + previous month + all-time totals. Returns `{ spent, income, net, savingsRate, expenseCount, incomeSourceCount, deltas, categories, monthLabel, balance, totalTransactions, firstTransactionDate }`. Balance is the honest all-time income − spend (always accurate regardless of import timing). Deltas: `%` for amounts, `pp` (percentage points) for savings rate. Null deltas render `—`. Spent-card delta arrow inverts (down = green, up = red). Category breakdown rolls categories past top 5 into an "Other" row. Monthly "Cash flow" card clarifies it's a flow, not net worth.
+- Analytics hub (`/dashboard/analytics`): interactive four-chart section with time range filters (30d | 3m | 6m | 12m | all). Fetches all transactions once, aggregates client-side. Shows (1) monthly income vs expense bar chart, (2) category donut + ranked list with percentages, (3) cumulative daily spend area chart, (4) payment mode donut (cash/card/upi/bank/other). KPI strip shows income/spent/net/savings-rate scoped to selected range. All chart colors use `var(--purple)` / `var(--orange)` CSS vars — theme-aware, accent-color-aware. Built with Recharts.
 
 **⏳ Next:** Full `/dashboard/transactions` list page with filters (category, date range, type)
 
@@ -28,13 +29,14 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 4. ✅ CSV/XLSX import — two-step modal: upload + header auto-detect (scans grid for `Date` + `Narration/Description` + amount-style columns, handles preamble/metadata) → column mapping with themed selects → row review (checkboxes, inline category dropdowns with keyword-based suggestions, bulk-assign, type toggle) → batch insert via `importTransactions(rows, fileName)` server action (RLS-gated, user_id-scoped, creates `import_batches` record + tags transactions with `import_batch_id`)
 5. ✅ All-time Balance card (hero: gradient text when positive, rose text when negative; subtitle explains edge cases — no income tracked, etc.) + renamed "Net this month" → "Cash flow" to clarify flow vs net worth
 6. ✅ Danger Zone — "Delete by import": per-import-batch delete from Profile → Danger Zone; "Delete by date": this month / last 6 months / all. Migration: `supabase/migrations/20260516_add_import_batches.sql` (manual run required)
-7. 📋 Full `/dashboard/transactions` list page with filters (category, date range, type) — reuses the same row + modal
+7. ✅ Analytics hub — `/dashboard/analytics` with interactive 4-chart section (income vs expense trend, category breakdown, daily spend, payment mode split), time-range filters (30d | 3m | 6m | 12m | all), KPI strip scoped to range. Built with Recharts, client-side aggregation.
+8. 📋 Full `/dashboard/transactions` list page with filters (category, date range, type) — reuses the same row + modal
 
-**Phase 2: Insights**
-- Spending charts (line over time, pie by category)
-- Monthly/weekly summary reports
+**Phase 2: Insights & Optimization**
+- Export to CSV
 - Budget tracking (spend vs limit)
-- Analytics page
+- Weekly/monthly summary reports
+- Additional dashboards (top merchants, recurring transactions)
 
 **Phase 3: Account & Compliance** (later, when MVP is stable)
 - Privacy & Security (data access, connected integrations)
@@ -49,6 +51,7 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 - **Theme:** `next-themes` with `attribute="class"`, `defaultTheme="dark"`, `enableSystem`. Toggle is `<ThemeToggle />`.
 - **Icons:** `lucide-react`
 - **Animation:** `framer-motion` — micro-interactions only (hover lift, tap scale, icon swap, card mount). No layout animations.
+- **Charts:** `recharts` — React-native, SSR-safe, all chart colors use CSS vars for theme/accent awareness
 - **Auth & DB:** Supabase (`@supabase/ssr` + `@supabase/supabase-js`). Email/password (confirmation required) + Google OAuth.
 - **File parsing:** `papaparse` (CSV), `xlsx` (Excel). Dynamically imported in import modal.
 
@@ -78,6 +81,8 @@ src/
 │   ├── dashboard/
 │   │   ├── layout.tsx        Dashboard shell (soft radial backdrop + sticky DashboardNav)
 │   │   ├── page.tsx          Home: greeting + glass date card, DashboardActions (Add Transaction + Import Statement), hero Balance card + 4 monthly KPI cards, recent transactions, category breakdown
+│   │   ├── analytics/
+│   │   │   └── page.tsx      Analytics hub: interactive 4-chart section with time-range filters
 │   │   ├── transactions/
 │   │   │   └── page.tsx      Full transaction list with filters (NOT YET BUILT)
 │   │   ├── profile/
@@ -87,7 +92,7 @@ src/
 │   │       ├── preferences-actions.ts    Save language + currency preferences
 │   │       └── categories-actions.ts     CRUD operations on categories table
 │   ├── actions/
-│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary / listImportBatches / deleteImportBatch / deleteTransactionsByFilter. All RLS-gated; mutating actions additionally scoped by user_id in WHERE clauses (defense-in-depth). `importTransactions(rows, filename)` inserts an `import_batches` record first, then batch-inserts transactions tagged with `import_batch_id`. `listImportBatches` returns all batches for the current user ordered by `created_at DESC`. `deleteImportBatch(id)` deletes the batch row — cascade auto-deletes linked transactions. `deleteTransactionsByFilter(filter)` handles time-range bulk deletes ("this_month" | "last_6_months" | "all"). `getMonthlySummary` fetches all user rows (no date filter), aggregates in JS to compute current + previous month + all-time. Returns `{ spent, income, net, savingsRate, expenseCount, incomeSourceCount, deltas, categories, monthLabel, balance, totalTransactions, firstTransactionDate }`.
+│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary / listImportBatches / deleteImportBatch / deleteTransactionsByFilter / getAllTransactionsRaw. All RLS-gated; mutating actions additionally scoped by user_id in WHERE clauses (defense-in-depth). `importTransactions(rows, filename)` inserts an `import_batches` record first, then batch-inserts transactions tagged with `import_batch_id`. `listImportBatches` returns all batches for the current user ordered by `created_at DESC`. `deleteImportBatch(id)` deletes the batch row — cascade auto-deletes linked transactions. `deleteTransactionsByFilter(filter)` handles time-range bulk deletes ("this_month" | "last_6_months" | "all"). `getMonthlySummary` fetches all user rows (no date filter), aggregates in JS to compute current + previous month + all-time. Returns `{ spent, income, net, savingsRate, expenseCount, incomeSourceCount, deltas, categories, monthLabel, balance, totalTransactions, firstTransactionDate }`. `getAllTransactionsRaw` returns all transactions (type, amount, category, payment_mode, date) for the current user, sorted by date ASC — used for analytics page client-side aggregation.
 │   ├── globals.css           Tailwind v4 @theme + CSS vars + glow utilities + .glass-pill + density/font-scale/accent overrides
 │   ├── layout.tsx            Root: Inter font + ThemeProvider + DensityProvider
 │   └── page.tsx              Landing page
@@ -112,7 +117,14 @@ src/
 │   ├── dashboard-summary-cards.tsx Hero Balance card (all-time income − spend, gradient text if positive, rose if negative, smart subtitle for edge cases) + 4 monthly KPI cards: Cash flow / Spent / Income / Savings rate — takes `summary: MonthlySummary` prop, renders signed values, MoM deltas (% for amounts, pp for savings rate, `—` when null), Spent delta arrow inverts (down = good)
 │   ├── dashboard-recent-transactions.tsx  Server component: fetches last 5 rows via `listRecentTransactions`, renders the shell + empty state, delegates list to client child
 │   ├── dashboard-recent-transactions-list.tsx  Client: clickable rows with always-visible pencil icon, opens shared modal in edit mode, save/delete toast
-│   └── dashboard-category-breakdown.tsx   Horizontal bars by category — takes `summary: MonthlySummary` prop, top 5 categories + "Other" rollup, icon fallback to Receipt, friendly empty state when no expenses
+│   ├── dashboard-category-breakdown.tsx   Horizontal bars by category — takes `summary: MonthlySummary` prop, top 5 categories + "Other" rollup, icon fallback to Receipt, friendly empty state when no expenses
+│   ├── analytics-shell.tsx   Client: owns all filter state + aggregation logic. Fetches `RawTransaction[]` from server, memoizes all derived data (monthly breakdown, category breakdown, payment modes, daily cumulative). Distributes slices to chart components as plain props.
+│   ├── analytics-filter-bar.tsx  Time range toggle pills (30d | 3m | 6m | 12m | all). Active = `bg-purple text-white`, inactive = muted with hover lift.
+│   ├── analytics-kpi-strip.tsx   4 stat cards (Income, Spent, Net, Savings Rate) scoped to selected range. Same `card-glow` + `bg-card` pattern as dashboard KPI cards.
+│   ├── analytics-trend-chart.tsx   Recharts `BarChart` — monthly income (purple) vs expense (orange) bars grouped per month. Responsive, custom tooltip styled to `bg-card border-border`.
+│   ├── analytics-category-chart.tsx   Recharts `PieChart` with `innerRadius` (donut). 8-color palette (purple, orange, + 6 neutrals). Left: donut, right: ranked list with category name + percentage bar. Hover on donut slice highlights matching list entry.
+│   ├── analytics-payment-chart.tsx   Recharts `PieChart` with `innerRadius` (donut). 5 fixed segments: Cash / Card / UPI / Bank / Other. Center label: total transaction count for range.
+│   └── analytics-spend-trend.tsx   Recharts `AreaChart` — cumulative daily expense over selected range. Gradient fill purple→transparent. Shows spend velocity at a glance.
 ├── lib/
 │   └── supabase/
 │       ├── client.ts         Browser client (Client Components)

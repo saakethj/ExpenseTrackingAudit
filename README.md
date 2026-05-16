@@ -2,7 +2,7 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import (two-step modal: upload + auto-detect → column mapping → commit) ✅ | All-time Balance card + Cash flow breakdown ✅ | Danger Zone: delete by import batch + delete by date range ✅
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import (two-step modal: upload + auto-detect → column mapping → commit) ✅ | All-time Balance card + Cash flow breakdown ✅ | Danger Zone: delete by import batch + delete by date range ✅ | Analytics hub with 4 interactive charts ✅
 >
 > **Next:** Full `/dashboard/transactions` list with filters (category, date range, type)
 
@@ -18,6 +18,7 @@ A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-
 | Auth & DB | Supabase (`@supabase/ssr`) — email/password + Google OAuth |
 | Icons | `lucide-react` |
 | Animation | `framer-motion` (micro-interactions only) |
+| Charts | `recharts` (React-native, SSR-safe, CSS-var aware) |
 | Font | Inter (SF Pro / Roboto stand-in) |
 
 ---
@@ -54,9 +55,9 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 | `/auth/callback` | ✅ | OAuth + email-confirm code exchange (no UI) |
 | `/dashboard` | ✅ | Greeting + glass date card, "Manage your money" quick actions, live summary cards (Net / Spent / Income / Savings rate with month-over-month deltas), live Recent Transactions list with row-level edit + delete, live category breakdown (top 5 + "Other"). Add / Edit / Delete all write live to Supabase. |
 | `/dashboard/profile` | ✅ | User profile with 5 working sections: General, Preferences, Categories, Appearance, Notifications. Danger Zone: delete transactions by import batch or date range (this month / last 6 months / all). |
+| `/dashboard/analytics` | ✅ | Interactive analytics hub: 4 charts (income vs expense trend, category breakdown, payment mode split, cumulative spend), time-range filters (30d / 3m / 6m / 12m / all), KPI strip scoped to range. Client-side aggregation from all transactions. |
 | `/dashboard/transactions` | ⏳ | Full transaction list with filters (next phase) |
 | `/dashboard/budgets` | 📋 | Budget tracking (Phase 2) |
-| `/dashboard/analytics` | 📋 | Charts & reports (Phase 2) |
 | `/dashboard/subscriptions` | 📋 | Subscription tracking (Phase 3) |
 
 ---
@@ -75,6 +76,8 @@ src/
 │   ├── dashboard/
 │   │   ├── layout.tsx        Dashboard shell (soft backdrop + sticky DashboardNav)
 │   │   ├── page.tsx          Home: greeting + glass date card + quick actions + summary + recent + category breakdown
+│   │   ├── analytics/
+│   │   │   └── page.tsx      Analytics hub with time-range filters + 4 interactive charts (Recharts)
 │   │   ├── transactions/
 │   │   │   └── page.tsx      Full transaction list (NOT YET BUILT)
 │   │   ├── profile/
@@ -84,7 +87,7 @@ src/
 │   │   │       ├── preferences-actions.ts
 │   │   │       └── categories-actions.ts
 │   ├── actions/
-│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary / listImportBatches / deleteImportBatch / deleteTransactionsByFilter. All whitelist validation, RLS-gated, user_id-scoped WHERE clauses for defense-in-depth. `importTransactions` now accepts a `filename` parameter, creates an `import_batches` record, and tags every inserted row with `import_batch_id`. `deleteImportBatch` cascades — deletes the batch record and all linked transactions in one query. `getMonthlySummary` returns current + previous month stats plus all-time balance and metadata.
+│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary / listImportBatches / deleteImportBatch / deleteTransactionsByFilter / getAllTransactionsRaw. All whitelist validation, RLS-gated, user_id-scoped WHERE clauses for defense-in-depth. `importTransactions` accepts a `filename` parameter, creates an `import_batches` record, and tags every inserted row with `import_batch_id`. `deleteImportBatch` cascades — deletes the batch record and all linked transactions in one query. `getMonthlySummary` returns current + previous month stats plus all-time balance and metadata. `getAllTransactionsRaw` returns all transactions (type, amount, category, payment_mode, date) for analytics client-side aggregation.
 │   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill + density/font-scale overrides
 │   ├── layout.tsx            Root layout (Inter font, ThemeProvider, DensityProvider)
 │   └── page.tsx              Landing page
@@ -109,7 +112,14 @@ src/
 │   ├── dashboard-summary-cards.tsx   Hero balance card (all-time income − spend, gradient text when positive, rose text when negative, smart subtitle) + 4 monthly KPI cards (Cash flow / Spent / Income / Savings rate) fed by `getMonthlySummary` — real values, signed, month-over-month deltas (% for amounts, pp for savings rate), `—` when no prior-month data
 │   ├── dashboard-recent-transactions.tsx Server: fetches last 5 rows via `listRecentTransactions`, renders the shell + empty state
 │   ├── dashboard-recent-transactions-list.tsx Client: clickable rows with always-visible pencil icon, opens edit modal, save/delete toast
-│   └── dashboard-category-breakdown.tsx  Horizontal bars by category — top 5 + "Other" rollup, icon fallback to Receipt, empty state when no expenses
+│   ├── dashboard-category-breakdown.tsx  Horizontal bars by category — top 5 + "Other" rollup, icon fallback to Receipt, empty state when no expenses
+│   ├── analytics-shell.tsx    Client: owns filter state (30d | 3m | 6m | 12m | all) + all aggregation logic. Fetches `RawTransaction[]` on mount, memoizes monthly breakdown, category breakdown, payment modes, daily cumulative spend.
+│   ├── analytics-filter-bar.tsx  Time range selector — 5 pill buttons. Active = `bg-purple text-white`.
+│   ├── analytics-kpi-strip.tsx   4 stat cards (Income, Spent, Net, Savings Rate) for selected range. Same `card-glow` pattern as dashboard.
+│   ├── analytics-trend-chart.tsx Recharts `BarChart` — monthly income (purple) vs expense (orange) bars. Responsive, custom tooltip.
+│   ├── analytics-category-chart.tsx Recharts `PieChart` (donut). Left: 8-color donut (top 8 categories + "Other"), right: ranked list with percentage bars. Hover interactions.
+│   ├── analytics-payment-chart.tsx Recharts `PieChart` (donut). 5 fixed segments (Cash / Card / UPI / Bank / Other). Center label: total transaction count.
+│   └── analytics-spend-trend.tsx  Recharts `AreaChart` — cumulative daily spend with gradient fill. Shows spend velocity over time.
 ├── lib/supabase/
 │   ├── client.ts             Browser client (for Client Components)
 │   ├── server.ts             Server client (for Server Components / Server Actions)
@@ -236,14 +246,14 @@ npx tsc --noEmit     # type-check
 - [x] CSV/XLSX import (two-step modal: upload + auto-detect columns → column mapping → row review + categorize → commit). Supports bank formats with metadata preamble, auto-detects headers, keyword-based category suggestions, batch insert via server action with RLS. Each import creates an `import_batches` record and tags transactions with `import_batch_id`.
 - [x] All-time Balance card (hero section showing total income − spend across all transactions, with smart subtitle for edge cases). Renamed "Net this month" → "Cash flow" to clarify it's a flow, not net worth
 - [x] Danger Zone — "Delete by import": lists all import batches (filename, date, count), per-batch delete with confirmation, optimistic list removal. "Delete by date": this month / last 6 months / all transactions.
+- [x] Analytics hub — `/dashboard/analytics` with interactive 4-chart section (income vs expense trend, category breakdown, daily spend, payment mode split), time-range filters (30d | 3m | 6m | 12m | all), KPI strip scoped to range. Built with Recharts, client-side aggregation.
 - [ ] Full `/dashboard/transactions` list with category + date-range + type filters
 
-**Phase 2: Insights** (after MVP is stable)
-- [ ] Spending charts (line over time, pie by category)
-- [ ] Monthly/weekly reports
+**Phase 2: Insights & Optimization** (after MVP is stable)
+- [ ] Weekly/monthly summary reports
 - [ ] Budget tracking (spend vs limit)
-- [ ] Export (CSV)
-- [ ] Analytics page
+- [ ] Export to CSV
+- [ ] Additional dashboards (top merchants, recurring transactions)
 
 **Phase 3: Account & Compliance** (later)
 - [ ] Privacy & Security section (data access, connected integrations)
