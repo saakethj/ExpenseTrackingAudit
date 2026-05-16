@@ -465,7 +465,7 @@ export function ImportModal({ open, onClose, onImported }: Props) {
       note: r.description.slice(0, 200) || undefined,
     }));
     setSubmitting(true);
-    const result = await importTransactions(payload);
+    const result = await importTransactions(payload, fileName);
     setSubmitting(false);
     if ("error" in result) {
       setError(result.error);

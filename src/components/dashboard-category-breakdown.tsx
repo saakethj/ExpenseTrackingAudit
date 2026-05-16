@@ -87,11 +87,11 @@ export function DashboardCategoryBreakdown({
         </div>
       ) : (
         <ul className="flex flex-1 flex-col justify-between gap-4 px-5 py-5 sm:px-6 sm:py-6">
-          {rows.map((c) => {
+          {rows.map((c, index) => {
             const pct = total > 0 ? Math.round((c.amount / total) * 100) : 0;
             const Icon = iconFor(c.label);
             return (
-              <li key={c.label}>
+              <li key={`${c.label}-${index}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span

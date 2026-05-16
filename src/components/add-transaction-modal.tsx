@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Banknote, CreditCard, Smartphone, Building2, MoreHorizontal, ChevronDown, Check, Loader2, Trash2 } from "lucide-react";
 import { addTransaction, updateTransaction, deleteTransaction } from "@/app/actions/transactions-actions";
+import { getCategoriesByType } from "@/app/actions/categories-actions";
 
 type TxType = "expense" | "income";
 type PaymentMode = "cash" | "card" | "upi" | "bank" | "other";
@@ -22,6 +23,12 @@ const PAYMENT_MODES: { id: PaymentMode; label: string; icon: React.ElementType }
 
 function todayISO(): string {
   return new Date().toISOString().split("T")[0]!;
+}
+
+function firstOfNextMonth(isoDate: string): string {
+  const [yyyy, mm] = isoDate.split("-").map(Number);
+  const d = new Date(yyyy!, mm!, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 type DropdownPos = { top: number; left: number; width: number };
@@ -67,10 +74,19 @@ export function AddTransactionModal({
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [categoryError, setCategoryError] = React.useState(false);
+  const [creditNextMonth, setCreditNextMonth] = React.useState(false);
 
   const isEdit = mode === "edit";
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => { setMounted(true); }, []);
+
+  const [customCategoryNames, setCustomCategoryNames] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    if (!open) return;
+    getCategoriesByType(type).then((cats) => {
+      setCustomCategoryNames(cats.map((c) => c.name));
+    });
+  }, [open, type]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -88,7 +104,12 @@ export function AddTransactionModal({
   }, [open, isEdit, initialValues]);
 
   const categoryBtnRef = React.useRef<HTMLButtonElement>(null);
-  const categories = type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const builtInCategories = type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const customSet = new Set(customCategoryNames.map((n) => n.toLowerCase()));
+  const categories = [
+    ...customCategoryNames,
+    ...builtInCategories.filter((c) => !customSet.has(c.toLowerCase())),
+  ];
 
   const initialCategoryRef = React.useRef<string | null>(null);
   React.useEffect(() => {
@@ -98,6 +119,7 @@ export function AddTransactionModal({
     }
     setCategory("");
     setCategoryOpen(false);
+    setCreditNextMonth(false);
   }, [type, isEdit, initialValues]);
 
   React.useEffect(() => {
@@ -158,6 +180,7 @@ export function AddTransactionModal({
     setSubmitError(null);
     setCategoryError(false);
     setConfirmDelete(false);
+    setCreditNextMonth(false);
   }
 
   function handleClose() { reset(); onClose(); }
@@ -169,12 +192,13 @@ export function AddTransactionModal({
     setCategoryError(false);
     setSubmitting(true);
     setSubmitError(null);
+    const effectiveDate = creditNextMonth && type === "income" ? firstOfNextMonth(date) : date;
     const payload = {
       type,
       amount: parseFloat(amount),
       category,
       payment_mode: paymentMode,
-      date,
+      date: effectiveDate,
       note: note || undefined,
     };
     const result = isEdit && transactionId
@@ -368,6 +392,32 @@ export function AddTransactionModal({
                       />
                     </div>
 
+                    {/* end-of-month salary toggle */}
+                    {type === "income" && (
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={creditNextMonth}
+                            onChange={(e) => setCreditNextMonth(e.target.checked)}
+                            className="accent-purple"
+                          />
+                          <span className="text-[13px] font-medium text-foreground/80">
+                            End-of-month credit — count in next month
+                          </span>
+                        </label>
+                        {creditNextMonth && (
+                          <p className="ml-6 text-xs text-muted-foreground">
+                            Counted in:{" "}
+                            {new Date(firstOfNextMonth(date) + "T00:00:00").toLocaleDateString(undefined, {
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {/* note */}
                     <div>
                       <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
@@ -487,8 +537,8 @@ export function AddTransactionModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 200 }}
-            className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl backdrop-blur-xl"
+            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, maxHeight: "300px", zIndex: 200 }}
+            className="overflow-y-auto rounded-xl border border-border bg-card shadow-2xl backdrop-blur-xl [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb:hover]:bg-muted-foreground/40"
           >
             {categories.map((c) => (
               <li key={c}>

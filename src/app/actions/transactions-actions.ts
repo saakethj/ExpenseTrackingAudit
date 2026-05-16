@@ -128,10 +128,12 @@ export async function deleteTransaction(
 }
 
 export async function importTransactions(
-  rows: AddTransactionInput[]
+  rows: AddTransactionInput[],
+  filename: string
 ): Promise<{ ok: true; count: number } | { error: string }> {
   if (!rows || rows.length === 0) return { error: "No rows to import." };
   if (rows.length > 1000) return { error: "Too many rows. Maximum 1000 per import." };
+  if (!filename?.trim()) return { error: "Filename is required." };
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]!;
@@ -149,6 +151,20 @@ export async function importTransactions(
 
   if (!user) return { error: "You must be signed in to import transactions." };
 
+  const { data: batchData, error: batchError } = await supabase
+    .from("import_batches")
+    .insert({
+      user_id: user.id,
+      filename: filename.trim(),
+      transaction_count: rows.length,
+    })
+    .select("id")
+    .single();
+
+  if (batchError) return { error: batchError.message };
+
+  const batchId = (batchData as { id: string }).id;
+
   const { error } = await supabase.from("transactions").insert(
     rows.map((r) => ({
       user_id: user.id,
@@ -158,6 +174,7 @@ export async function importTransactions(
       payment_mode: r.payment_mode,
       date: r.date,
       note: r.note?.trim() || null,
+      import_batch_id: batchId,
     }))
   );
 
@@ -183,6 +200,13 @@ export type TransactionFilters = {
   category?: string;
   dateFrom?: string;
   dateTo?: string;
+};
+
+export type ImportBatch = {
+  id: string;
+  filename: string;
+  transaction_count: number;
+  created_at: string;
 };
 
 export async function listRecentTransactions(
@@ -271,6 +295,94 @@ function toIsoDate(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+export type DeleteFilter = "this_month" | "last_6_months" | "all";
+
+export async function deleteTransactionsByFilter(filter: DeleteFilter): Promise<{ ok: true; count: number } | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "You must be signed in." };
+
+  const now = new Date();
+  let dateFrom: string | undefined;
+
+  if (filter === "this_month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    dateFrom = start.toISOString().split("T")[0];
+  } else if (filter === "last_6_months") {
+    const start = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+    dateFrom = start.toISOString().split("T")[0];
+  }
+
+  let countQuery = supabase.from("transactions").select("id", { count: "exact" }).eq("user_id", user.id);
+  if (dateFrom) {
+    countQuery = countQuery.gte("date", dateFrom);
+  }
+
+  const { count, error: countError } = await countQuery;
+  if (countError) return { error: countError.message };
+
+  let deleteQuery = supabase.from("transactions").delete().eq("user_id", user.id);
+  if (dateFrom) {
+    deleteQuery = deleteQuery.gte("date", dateFrom);
+  }
+
+  const { error } = await deleteQuery;
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
+  revalidatePath("/dashboard/profile");
+
+  return { ok: true, count: count ?? 0 };
+}
+
+export async function listImportBatches(): Promise<ImportBatch[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("import_batches")
+    .select("id, filename, transaction_count, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return (data ?? []) as ImportBatch[];
+}
+
+export async function deleteImportBatch(
+  id: string
+): Promise<{ ok: true } | { error: string }> {
+  if (!id) return { error: "Missing batch id." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "You must be signed in." };
+
+  const { error } = await supabase
+    .from("import_batches")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
+
+  return { ok: true };
 }
 
 export async function getMonthlySummary(): Promise<MonthlySummary> {
