@@ -2,7 +2,7 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import (two-step modal: upload + auto-detect → column mapping → commit) ✅ | All-time Balance card + Cash flow breakdown ✅
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import (two-step modal: upload + auto-detect → column mapping → commit) ✅ | All-time Balance card + Cash flow breakdown ✅ | Danger Zone: delete by import batch + delete by date range ✅
 >
 > **Next:** Full `/dashboard/transactions` list with filters (category, date range, type)
 
@@ -53,7 +53,7 @@ In Supabase Dashboard → Authentication → URL Configuration, add `http://loca
 | `/signup` | ✅ | Create account (Google + email/password, confirmation required) |
 | `/auth/callback` | ✅ | OAuth + email-confirm code exchange (no UI) |
 | `/dashboard` | ✅ | Greeting + glass date card, "Manage your money" quick actions, live summary cards (Net / Spent / Income / Savings rate with month-over-month deltas), live Recent Transactions list with row-level edit + delete, live category breakdown (top 5 + "Other"). Add / Edit / Delete all write live to Supabase. |
-| `/dashboard/profile` | ✅ | User profile with 5 working sections: General, Preferences, Categories, Appearance, Notifications |
+| `/dashboard/profile` | ✅ | User profile with 5 working sections: General, Preferences, Categories, Appearance, Notifications. Danger Zone: delete transactions by import batch or date range (this month / last 6 months / all). |
 | `/dashboard/transactions` | ⏳ | Full transaction list with filters (next phase) |
 | `/dashboard/budgets` | 📋 | Budget tracking (Phase 2) |
 | `/dashboard/analytics` | 📋 | Charts & reports (Phase 2) |
@@ -84,7 +84,7 @@ src/
 │   │   │       ├── preferences-actions.ts
 │   │   │       └── categories-actions.ts
 │   ├── actions/
-│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary. All whitelist validation, RLS-gated, user_id-scoped WHERE clauses for defense-in-depth. `getMonthlySummary` returns current + previous month stats plus all-time balance and metadata.
+│   │   └── transactions-actions.ts  addTransaction / updateTransaction / deleteTransaction / listRecentTransactions / importTransactions / getMonthlySummary / listImportBatches / deleteImportBatch / deleteTransactionsByFilter. All whitelist validation, RLS-gated, user_id-scoped WHERE clauses for defense-in-depth. `importTransactions` now accepts a `filename` parameter, creates an `import_batches` record, and tags every inserted row with `import_batch_id`. `deleteImportBatch` cascades — deletes the batch record and all linked transactions in one query. `getMonthlySummary` returns current + previous month stats plus all-time balance and metadata.
 │   ├── globals.css           Tailwind v4 @theme + CSS variables + .glass-pill + density/font-scale overrides
 │   ├── layout.tsx            Root layout (Inter font, ThemeProvider, DensityProvider)
 │   └── page.tsx              Landing page
@@ -104,7 +104,8 @@ src/
 │   ├── profile-shell.tsx     Profile sidebar nav + content switcher
 │   ├── dashboard-actions.tsx Quick-actions section (Add Transaction + Import Statement buttons) — owns both modals + shared toast
 │   ├── add-transaction-modal.tsx     Shared modal: `mode: "create" | "edit"` with optional `initialValues` + `transactionId`. Portaled to `document.body` so it overlays the entire viewport; trash icon → inline confirm → delete
-│   ├── import-modal.tsx              Two-step import modal: Step 1 file upload (CSV/XLSX, auto-detects headers via regex scan), column mapping with auto-detect; Step 2 row review with checkboxes, inline category dropdowns, bulk-assign, type toggle. Portaled. Calls `importTransactions` server action.
+│   ├── import-modal.tsx              Two-step import modal: Step 1 file upload (CSV/XLSX, auto-detects headers via regex scan), column mapping with auto-detect; Step 2 row review with checkboxes, inline category dropdowns, bulk-assign, type toggle. Portaled. Calls `importTransactions(rows, fileName)` — passes the file's original name so it can be tracked as an import batch.
+│   ├── danger-zone-panel.tsx         Danger Zone UI with two sections: "Delete by import" — lists every import batch (filename, date, transaction count) in a scrollable container, per-batch delete with confirmation modal, optimistic list update on success; "Delete by date" — time-range bulk deletes (this month / last 6 months / all transactions). Each section has its own confirmation modal and error/success feedback.
 │   ├── dashboard-summary-cards.tsx   Hero balance card (all-time income − spend, gradient text when positive, rose text when negative, smart subtitle) + 4 monthly KPI cards (Cash flow / Spent / Income / Savings rate) fed by `getMonthlySummary` — real values, signed, month-over-month deltas (% for amounts, pp for savings rate), `—` when no prior-month data
 │   ├── dashboard-recent-transactions.tsx Server: fetches last 5 rows via `listRecentTransactions`, renders the shell + empty state
 │   ├── dashboard-recent-transactions-list.tsx Client: clickable rows with always-visible pencil icon, opens edit modal, save/delete toast
@@ -190,6 +191,23 @@ Live tables in Supabase (Postgres). All financial tables enforce row-level secur
 
 Indexed on `(user_id, date DESC)`. RLS policies cover all four CRUD operations, each gated on `auth.uid() = user_id`. Validation runs twice — server action whitelists enums *and* the DB enforces CHECK constraints (defense in depth).
 
+The `import_batch_id` column (`uuid`, nullable, FK → `import_batches(id) ON DELETE CASCADE`) is set on every transaction inserted via `importTransactions`. Manually-added transactions have `null` here.
+
+### `public.import_batches`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `user_id` | `uuid` FK → `auth.users(id)` | `ON DELETE CASCADE` |
+| `filename` | `text` | Original name of the uploaded file |
+| `transaction_count` | `int` | Row count at import time |
+| `created_at` | `timestamptz` | `default now()` |
+
+- **Index:** `idx_import_batches_user` on `(user_id, created_at DESC)`
+- **RLS:** 3 policies — `users_select_own`, `users_insert_own`, `users_delete_own`
+- **Cascade:** deleting a batch row auto-deletes all linked transactions via the FK cascade on `transactions.import_batch_id`
+- **Migration:** `supabase/migrations/20260516_add_import_batches.sql` — must be run manually in Supabase SQL Editor
+
 ---
 
 ## Scripts
@@ -215,8 +233,9 @@ npx tsc --noEmit     # type-check
 - [x] Recent Transactions wired to live DB rows (last 5, ordered by date)
 - [x] Row-level edit + delete on Recent Transactions — same modal in `edit` mode, inline delete confirm, RLS + user_id-scoped server actions
 - [x] Summary cards + category breakdown wired to real DB aggregates via `getMonthlySummary` (single query, month-over-month deltas)
-- [x] CSV/XLSX import (two-step modal: upload + auto-detect columns → column mapping → row review + categorize → commit). Supports bank formats with metadata preamble, auto-detects headers, keyword-based category suggestions, batch insert via server action with RLS
+- [x] CSV/XLSX import (two-step modal: upload + auto-detect columns → column mapping → row review + categorize → commit). Supports bank formats with metadata preamble, auto-detects headers, keyword-based category suggestions, batch insert via server action with RLS. Each import creates an `import_batches` record and tags transactions with `import_batch_id`.
 - [x] All-time Balance card (hero section showing total income − spend across all transactions, with smart subtitle for edge cases). Renamed "Net this month" → "Cash flow" to clarify it's a flow, not net worth
+- [x] Danger Zone — "Delete by import": lists all import batches (filename, date, count), per-batch delete with confirmation, optimistic list removal. "Delete by date": this month / last 6 months / all transactions.
 - [ ] Full `/dashboard/transactions` list with category + date-range + type filters
 
 **Phase 2: Insights** (after MVP is stable)
