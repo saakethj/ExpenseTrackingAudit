@@ -211,6 +211,26 @@ export async function getBudgets(): Promise<
   return { ok: true, budgets };
 }
 
+// Lightweight alerts query for the dashboard home — returns only ACTIVE budgets
+// at >= 80% utilization, ordered worst-first. Used to surface warnings without
+// fetching the full budget list.
+export async function getBudgetAlerts(): Promise<
+  { ok: true; alerts: BudgetWithSpend[] } | { error: string }
+> {
+  const result = await getBudgets();
+  if ("error" in result) return { error: result.error };
+
+  const today = new Date().toISOString().split("T")[0]!;
+  const active = result.budgets.filter(
+    (b) => b.period_start <= today && b.period_end >= today
+  );
+  const alerts = active
+    .filter((b) => b.percent_used >= 80)
+    .sort((a, b) => b.percent_used - a.percent_used);
+
+  return { ok: true, alerts };
+}
+
 // Historical periods for a given budget category (null = overall).
 // Returns each past period with its limit + actual spend, oldest first.
 export async function getBudgetHistory(

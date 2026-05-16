@@ -5,6 +5,7 @@ import { DashboardSummaryCards } from "@/components/dashboard-summary-cards";
 import { DashboardRecentTransactions } from "@/components/dashboard-recent-transactions";
 import { DashboardCategoryBreakdown } from "@/components/dashboard-category-breakdown";
 import { DashboardActions } from "@/components/dashboard-actions";
+import { BudgetAlerts } from "@/components/budget-alerts";
 
 function getGreeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -124,6 +125,8 @@ export default async function DashboardPage() {
         <DashboardActions />
 
         <DashboardSummaryCards summary={summary} />
+
+        <BudgetAlerts />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           <div className="lg:col-span-2">
