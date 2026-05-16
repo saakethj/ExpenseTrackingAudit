@@ -53,7 +53,8 @@ export default async function ProfilePage() {
     lastName = parts.slice(1).join(" ");
   }
 
-  const displayName = metaFull || `${firstName} ${lastName}`.trim() || handle;
+  const composed = `${firstName} ${lastName}`.trim();
+  const displayName = composed || metaFull || handle;
   const gender = (meta.gender as string | undefined) ?? "";
   const country = (meta.country as string | undefined) ?? "";
 
