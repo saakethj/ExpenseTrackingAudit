@@ -498,3 +498,36 @@ export async function getMonthlySummary(): Promise<MonthlySummary> {
     firstTransactionDate: firstDate,
   };
 }
+
+export type RawTransaction = {
+  type: TransactionType;
+  amount: number;
+  category: string;
+  payment_mode: PaymentMode;
+  date: string;
+};
+
+export async function getAllTransactionsRaw(): Promise<RawTransaction[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("type, amount, category, payment_mode, date")
+    .eq("user_id", user.id)
+    .order("date", { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    type: row.type as TransactionType,
+    amount: Number(row.amount),
+    category: row.category,
+    payment_mode: row.payment_mode as PaymentMode,
+    date: row.date,
+  }));
+}
