@@ -60,6 +60,7 @@ export async function addTransaction(
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
   return { ok: true };
 }
 
@@ -97,6 +98,7 @@ export async function updateTransaction(
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
   return { ok: true };
 }
 
@@ -121,6 +123,7 @@ export async function deleteTransaction(
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
   return { ok: true };
 }
 
@@ -161,6 +164,7 @@ export async function importTransactions(
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
   return { ok: true, count: rows.length };
 }
 
@@ -172,6 +176,13 @@ export type RecentTransaction = {
   payment_mode: PaymentMode;
   date: string;
   note: string | null;
+};
+
+export type TransactionFilters = {
+  type?: TransactionType;
+  category?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export async function listRecentTransactions(
@@ -191,6 +202,45 @@ export async function listRecentTransactions(
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (error) return [];
+  return (data ?? []) as RecentTransaction[];
+}
+
+export async function listTransactions(
+  filters?: TransactionFilters
+): Promise<RecentTransaction[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  let query = supabase
+    .from("transactions")
+    .select("id, type, amount, category, payment_mode, date, note")
+    .eq("user_id", user.id);
+
+  if (filters?.type) {
+    query = query.eq("type", filters.type);
+  }
+
+  if (filters?.category) {
+    query = query.eq("category", filters.category);
+  }
+
+  if (filters?.dateFrom) {
+    query = query.gte("date", filters.dateFrom);
+  }
+
+  if (filters?.dateTo) {
+    query = query.lte("date", filters.dateTo);
+  }
+
+  const { data, error } = await query
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) return [];
   return (data ?? []) as RecentTransaction[];
