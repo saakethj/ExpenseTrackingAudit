@@ -9,6 +9,7 @@ export type Category = {
   color: string;
   icon: string;
   sort_order: number;
+  transaction_type?: "expense" | "income" | "both";
 };
 
 export async function createCategoryAction(data: {
@@ -16,6 +17,7 @@ export async function createCategoryAction(data: {
   color: string;
   icon: string;
   sort_order: number;
+  transaction_type?: "expense" | "income" | "both";
 }): Promise<{ id?: string; error?: string }> {
   const supabase = await createClient();
   const {
@@ -26,7 +28,7 @@ export async function createCategoryAction(data: {
 
   const { data: row, error } = await supabase
     .from("categories")
-    .insert({ user_id: user.id, ...data })
+    .insert({ user_id: user.id, ...data, transaction_type: data.transaction_type || "both" })
     .select("id")
     .single();
 
@@ -55,6 +57,41 @@ export async function updateCategoryAction(
   if (error) return { error: error.message };
   revalidatePath("/dashboard/profile");
   return {};
+}
+
+export async function getUserCategories(): Promise<Category[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, color, icon, sort_order, transaction_type")
+    .eq("user_id", user.id)
+    .order("sort_order", { ascending: true });
+
+  if (error) return [];
+  return (data ?? []) as Category[];
+}
+
+export async function getCategoriesByType(type: "expense" | "income"): Promise<Category[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, color, icon, sort_order, transaction_type")
+    .eq("user_id", user.id)
+    .or(`transaction_type.eq.${type},transaction_type.eq.both`)
+    .order("sort_order", { ascending: true });
+
+  if (error) return [];
+  return (data ?? []) as Category[];
 }
 
 export async function deleteCategoryAction(id: string): Promise<{ error?: string }> {

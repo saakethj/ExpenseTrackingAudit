@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User2,
@@ -49,7 +48,6 @@ export function GeneralPanel({
   gender: initGender,
   country: initCountry,
 }: GeneralPanelProps) {
-  const router = useRouter();
   const isGoogle = provider === "google";
 
   // ── Profile section ────────────────────────────────────────────
@@ -78,8 +76,10 @@ export function GeneralPanel({
       const result = await saveProfileAction({ firstName, lastName, gender, country });
       if (result.error) throw new Error(result.error);
       setProfileDone(true);
-      setTimeout(() => setProfileDone(false), 2500);
-      router.refresh();
+      setTimeout(() => {
+        setProfileDone(false);
+        window.location.reload();
+      }, 800);
     } catch (e) {
       setProfileError(e instanceof Error ? e.message : "Could not save profile.");
     } finally {
@@ -169,7 +169,6 @@ export function GeneralPanel({
       setTimeout(() => {
         setPwOpen(false);
         setPwDone(false);
-        router.refresh();
       }, 1400);
     } catch (e) {
       setPwError(e instanceof Error ? e.message : "Could not update password.");

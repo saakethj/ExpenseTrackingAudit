@@ -29,6 +29,7 @@ import {
   NotificationsPanel,
   type NotificationsPanelProps,
 } from "@/components/notifications-panel";
+import { DangerZonePanel } from "@/components/danger-zone-panel";
 
 type NavItem = { key: ProfileNavKey; label: string; icon: LucideIcon };
 type Section = { title: string; items: NavItem[] };
@@ -249,7 +250,18 @@ export function ProfileShell({ preferences, categories, notifications, ...props 
               <NotificationsPanel {...notifications} />
             </motion.div>
           )}
-          {active !== "general" && active !== "preferences" && active !== "categories" && active !== "appearance" && active !== "notifications" && (
+          {active === "danger-zone" && (
+            <motion.div
+              key="danger-zone"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <DangerZonePanel />
+            </motion.div>
+          )}
+          {active !== "general" && active !== "preferences" && active !== "categories" && active !== "appearance" && active !== "notifications" && active !== "danger-zone" && (
             <motion.div
               key={active}
               initial={{ opacity: 0, y: 8 }}

@@ -31,7 +31,7 @@ export function DashboardNav() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-3 z-20 px-3 sm:top-4 sm:px-6">
+    <header className="sticky top-3 z-60 px-3 sm:top-4 sm:px-6">
       <div className="glass-pill mx-auto max-w-7xl rounded-2xl">
         <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-7 md:grid md:grid-cols-[1fr_auto_1fr]">
           
