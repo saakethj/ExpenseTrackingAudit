@@ -5,27 +5,41 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 export interface AnalyticsCategoryChartProps {
   categoryBreakdown: { label: string; amount: number; pct: number }[];
+  totalSpent: number;
 }
 
 const COLORS = [
   "var(--purple)",
   "var(--orange)",
-  "#3b82f6",
-  "#ec4899",
-  "#06b6d4",
-  "#eab308",
-  "#f59e0b",
-  "#10b981",
+  "#60a5fa",
+  "#34d399",
+  "#f472b6",
+  "#22d3ee",
+  "#fbbf24",
+  "#a3a3a3",
+  "#94a3b8",
 ];
 
-export function AnalyticsCategoryChart({ categoryBreakdown }: AnalyticsCategoryChartProps) {
-  const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
+function formatCompact(value: number): string {
+  if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+  if (value >= 1000) return `₹${(value / 1000).toFixed(1)}k`;
+  return `₹${Math.round(value)}`;
+}
+
+export function AnalyticsCategoryChart({
+  categoryBreakdown,
+  totalSpent,
+}: AnalyticsCategoryChartProps) {
+  const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
 
   if (categoryBreakdown.length === 0) {
     return (
-      <div className="card-glow rounded-2xl border border-border bg-card p-6">
-        <h3 className="text-sm font-semibold text-foreground">Category breakdown</h3>
-        <div className="mt-6 flex items-center justify-center py-12 text-sm text-muted-foreground">
+      <div className="card-glow flex h-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <h3 className="text-base font-semibold text-foreground">
+          Category breakdown
+        </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">Where your money went</p>
+        <div className="mt-6 flex flex-1 items-center justify-center py-10 text-sm text-muted-foreground">
           No expenses to show
         </div>
       </div>
@@ -33,74 +47,93 @@ export function AnalyticsCategoryChart({ categoryBreakdown }: AnalyticsCategoryC
   }
 
   return (
-    <div className="card-glow rounded-2xl border border-border bg-card p-6">
-      <h3 className="text-sm font-semibold text-foreground">Category breakdown</h3>
-      <div className="mt-4 flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1">
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={categoryBreakdown}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                dataKey="amount"
-                onMouseEnter={(_, index) => setActiveCategory(categoryBreakdown[index].label)}
-                onMouseLeave={() => setActiveCategory(null)}
-              >
-                {categoryBreakdown.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                    opacity={!activeCategory || activeCategory === entry.label ? 1 : 0.4}
-                  />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+    <div className="card-glow flex h-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <h3 className="text-base font-semibold text-foreground">
+        Category breakdown
+      </h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">Where your money went</p>
 
-        <div className="flex-1 space-y-2 overflow-y-auto">
-          {categoryBreakdown.map((category, index) => (
-            <div
+      <div className="relative mx-auto mt-4 h-[180px] w-[180px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={categoryBreakdown}
+              cx="50%"
+              cy="50%"
+              innerRadius={62}
+              outerRadius={88}
+              paddingAngle={1.5}
+              dataKey="amount"
+              stroke="none"
+              onMouseEnter={(_, index) => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+            >
+              {categoryBreakdown.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                  opacity={
+                    activeIndex === null || activeIndex === index ? 1 : 0.35
+                  }
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {activeIndex !== null ? categoryBreakdown[activeIndex].label : "Total"}
+          </span>
+          <span className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
+            {formatCompact(
+              activeIndex !== null
+                ? categoryBreakdown[activeIndex].amount
+                : totalSpent
+            )}
+          </span>
+          {activeIndex !== null && (
+            <span className="text-[10px] text-muted-foreground">
+              {categoryBreakdown[activeIndex].pct.toFixed(1)}%
+            </span>
+          )}
+        </div>
+      </div>
+
+      <ul className="mt-5 max-h-56 space-y-2 overflow-y-auto pr-1 scrollbar-none">
+        {categoryBreakdown.map((category, index) => {
+          const dimmed = activeIndex !== null && activeIndex !== index;
+          return (
+            <li
               key={category.label}
-              onMouseEnter={() => setActiveCategory(category.label)}
-              onMouseLeave={() => setActiveCategory(null)}
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                !activeCategory || activeCategory === category.label
-                  ? "bg-muted/40"
-                  : "opacity-50"
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+              className={`group rounded-lg px-2 py-1.5 transition-opacity ${
+                dimmed ? "opacity-40" : "opacity-100"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="h-2 w-2 shrink-0 rounded-full"
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                   />
-                  <span className="truncate text-xs font-medium text-foreground">
+                  <span className="truncate text-[13px] font-medium text-foreground">
                     {category.label}
                   </span>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {category.pct.toFixed(0)}%
-                </span>
+                <div className="flex shrink-0 items-baseline gap-2">
+                  <span className="text-[12px] font-semibold text-foreground">
+                    {formatCompact(category.amount)}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {category.pct.toFixed(0)}%
+                  </span>
+                </div>
               </div>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full"
-                  style={{
-                    width: `${category.pct}%`,
-                    backgroundColor: COLORS[index % COLORS.length],
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

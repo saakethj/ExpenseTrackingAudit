@@ -3,11 +3,11 @@
 type Range = "30d" | "3m" | "6m" | "12m" | "all";
 
 const RANGE_OPTIONS: { label: string; value: Range }[] = [
-  { label: "30 days", value: "30d" },
-  { label: "3 months", value: "3m" },
-  { label: "6 months", value: "6m" },
-  { label: "1 year", value: "12m" },
-  { label: "All time", value: "all" },
+  { label: "30D", value: "30d" },
+  { label: "3M", value: "3m" },
+  { label: "6M", value: "6m" },
+  { label: "1Y", value: "12m" },
+  { label: "All", value: "all" },
 ];
 
 export interface AnalyticsFilterBarProps {
@@ -17,22 +17,30 @@ export interface AnalyticsFilterBarProps {
 
 export function AnalyticsFilterBar({ range, onRangeChange }: AnalyticsFilterBarProps) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="flex flex-wrap gap-2">
-        {RANGE_OPTIONS.map((option) => (
+    <div
+      role="tablist"
+      aria-label="Time range"
+      className="inline-flex shrink-0 self-start rounded-full border border-border bg-card/60 p-1 backdrop-blur-xl sm:self-end"
+    >
+      {RANGE_OPTIONS.map((option) => {
+        const active = range === option.value;
+        return (
           <button
             key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
             onClick={() => onRangeChange(option.value)}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              range === option.value
-                ? "bg-purple text-white"
-                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            className={`rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-wide transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4 sm:text-[13px] ${
+              active
+                ? "bg-purple text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {option.label}
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import * as React from "react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 export interface AnalyticsPaymentChartProps {
   paymentModeBreakdown: { mode: string; amount: number; count: number }[];
@@ -9,55 +10,119 @@ export interface AnalyticsPaymentChartProps {
 const PAYMENT_COLORS: Record<string, string> = {
   cash: "var(--purple)",
   card: "var(--orange)",
-  upi: "#3b82f6",
-  bank: "#10b981",
-  other: "#6b7280",
+  upi: "#60a5fa",
+  bank: "#34d399",
+  other: "#94a3b8",
 };
 
-export function AnalyticsPaymentChart({ paymentModeBreakdown }: AnalyticsPaymentChartProps) {
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: "Cash",
+  card: "Card",
+  upi: "UPI",
+  bank: "Bank",
+  other: "Other",
+};
+
+export function AnalyticsPaymentChart({
+  paymentModeBreakdown,
+}: AnalyticsPaymentChartProps) {
+  const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+
   if (paymentModeBreakdown.length === 0) {
     return (
-      <div className="card-glow rounded-2xl border border-border bg-card p-6">
-        <h3 className="text-sm font-semibold text-foreground">Payment mode</h3>
-        <div className="mt-6 flex items-center justify-center py-12 text-sm text-muted-foreground">
+      <div className="card-glow flex h-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <h3 className="text-base font-semibold text-foreground">Payment mode</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">How you paid</p>
+        <div className="mt-6 flex flex-1 items-center justify-center py-10 text-sm text-muted-foreground">
           No data for this period
         </div>
       </div>
     );
   }
 
-  const totalCount = paymentModeBreakdown.reduce((sum, p) => sum + p.count, 0);
+  const totalCount = paymentModeBreakdown.reduce((s, p) => s + p.count, 0);
+  const data = paymentModeBreakdown.map((p) => ({
+    ...p,
+    pct: totalCount > 0 ? (p.count / totalCount) * 100 : 0,
+  }));
 
   return (
-    <div className="card-glow rounded-2xl border border-border bg-card p-6">
-      <h3 className="text-sm font-semibold text-foreground">Payment mode</h3>
-      <div className="mt-4">
-        <ResponsiveContainer width="100%" height={240}>
+    <div className="card-glow flex h-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <h3 className="text-base font-semibold text-foreground">Payment mode</h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">How you paid</p>
+
+      <div className="relative mx-auto mt-4 h-[180px] w-[180px]">
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={paymentModeBreakdown}
+              data={data}
               cx="50%"
               cy="50%"
-              innerRadius={40}
-              outerRadius={70}
-              paddingAngle={2}
+              innerRadius={62}
+              outerRadius={88}
+              paddingAngle={1.5}
               dataKey="count"
-              label={false}
+              stroke="none"
+              onMouseEnter={(_, index) => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
             >
-              {paymentModeBreakdown.map((entry) => (
-                <Cell key={entry.mode} fill={PAYMENT_COLORS[entry.mode] || "#6b7280"} />
+              {data.map((entry, index) => (
+                <Cell
+                  key={entry.mode}
+                  fill={PAYMENT_COLORS[entry.mode] ?? "#94a3b8"}
+                  opacity={
+                    activeIndex === null || activeIndex === index ? 1 : 0.35
+                  }
+                />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(value: any) => `${value} transaction${value > 1 ? "s" : ""}`}
-            />
           </PieChart>
         </ResponsiveContainer>
-        <div className="mt-4 text-center">
-          <p className="text-2xl font-semibold text-foreground">{totalCount}</p>
-          <p className="text-xs text-muted-foreground">total transactions</p>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {activeIndex !== null
+              ? PAYMENT_LABELS[data[activeIndex].mode] ?? data[activeIndex].mode
+              : "Total"}
+          </span>
+          <span className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
+            {activeIndex !== null ? data[activeIndex].count : totalCount}
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {activeIndex !== null
+              ? `${data[activeIndex].pct.toFixed(1)}%`
+              : `transaction${totalCount === 1 ? "" : "s"}`}
+          </span>
         </div>
       </div>
+
+      <ul className="mt-5 grid grid-cols-2 gap-2">
+        {data.map((entry, index) => {
+          const dimmed = activeIndex !== null && activeIndex !== index;
+          return (
+            <li
+              key={entry.mode}
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-opacity ${
+                dimmed ? "opacity-40" : "opacity-100"
+              }`}
+            >
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{
+                  backgroundColor: PAYMENT_COLORS[entry.mode] ?? "#94a3b8",
+                }}
+              />
+              <span className="truncate text-[12px] font-medium text-foreground">
+                {PAYMENT_LABELS[entry.mode] ?? entry.mode}
+              </span>
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                {entry.pct.toFixed(0)}%
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
