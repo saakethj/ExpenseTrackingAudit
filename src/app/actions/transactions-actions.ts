@@ -505,6 +505,7 @@ export type RawTransaction = {
   category: string;
   payment_mode: PaymentMode;
   date: string;
+  note: string | null;
 };
 
 export async function getAllTransactionsRaw(): Promise<RawTransaction[]> {
@@ -517,7 +518,7 @@ export async function getAllTransactionsRaw(): Promise<RawTransaction[]> {
 
   const { data, error } = await supabase
     .from("transactions")
-    .select("type, amount, category, payment_mode, date")
+    .select("type, amount, category, payment_mode, date, note")
     .eq("user_id", user.id)
     .order("date", { ascending: true });
 
@@ -529,5 +530,6 @@ export async function getAllTransactionsRaw(): Promise<RawTransaction[]> {
     category: row.category,
     payment_mode: row.payment_mode as PaymentMode,
     date: row.date,
+    note: row.note ?? null,
   }));
 }
