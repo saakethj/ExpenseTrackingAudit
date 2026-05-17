@@ -2,9 +2,11 @@
 
 A secure, multi-user financial dashboard with an audit-grade aesthetic — dark-first, purple + orange gradient accents, built on Next.js 15 and Tailwind CSS v4.
 
-> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import (two-step modal: upload + auto-detect → column mapping → commit) ✅ | All-time Balance card + Cash flow breakdown ✅ | Danger Zone: delete by import batch + delete by date range ✅ | Analytics hub with insight cards + 4 interactive charts ✅
+> **Status:** Auth ✅ | Dashboard shell ✅ | User profile (5/7 sections) ✅ | Appearance system ✅ | Dashboard home UI ✅ | Add / Edit / Delete Transaction (modal + server actions + RLS) ✅ | Recent Transactions (live DB) ✅ | Summary cards + Category breakdown (live DB aggregates) ✅ | CSV/XLSX import ✅ | All-time Balance card + Cash flow breakdown ✅ | Danger Zone: delete by import batch + delete by date range ✅ | Analytics hub with insight cards + 4 interactive charts ✅ | Subscriptions tracking ✅ | Budgets tracking ✅
 >
-> **Next:** Full `/dashboard/transactions` list with filters (category, date range, type)
+> **In progress (Data & Security phase):** Import & Export panel (CSV export for transactions + subscriptions) · Privacy & Security panel (connected accounts display + account deletion) · Categories `transaction_type` pill (Both / Expenses / Income) · Profile nav cleanup (remove dead stub items)
+>
+> **Next after D&S:** Full `/dashboard/transactions` list with filters (category, date range, type)
 
 ---
 
@@ -42,6 +44,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon public key>
 ```
 
 Only the `anon` key belongs here — never the `service_role` key. Restart the dev server after editing.
+
+> **Coming with the Privacy & Security panel:** the "Delete Account" flow needs an additional server-only env var, `SUPABASE_SERVICE_ROLE_KEY` (no `NEXT_PUBLIC_` prefix — must never be exposed to the browser). Found in Supabase Dashboard → Project Settings → API → `service_role` key. Until this is set, account deletion will return an error; the rest of the panel (display info, sign-in method badge) still works.
 
 In Supabase Dashboard → Authentication → URL Configuration, add `http://localhost:3000/auth/callback` to **Redirect URLs**. For Google OAuth, also add the same URL to **Authorized redirect URIs** in your Google Cloud OAuth client (the one Supabase uses is `https://<your-project-ref>.supabase.co/auth/v1/callback`).
 
@@ -249,18 +253,21 @@ npx tsc --noEmit     # type-check
 - [x] Analytics hub — `/dashboard/analytics` with gradient page header, inline segmented time-range filter (30D | 3M | 6M | 1Y | All), 4 **insight** cards (Avg daily spend, Top category, Biggest expense, vs prior period / Active days), and 4 charts (income vs expense bars, category donut with center label, cumulative spend area, payment mode donut). Built with Recharts, client-side aggregation, theme + accent-color aware via CSS vars.
 - [ ] Full `/dashboard/transactions` list with category + date-range + type filters
 
-**Phase 2: Insights & Optimization** (after MVP is stable)
+**Phase 2: Insights & Optimization** (mostly done)
+- [x] Budget tracking (spend vs limit) — `/dashboard/budgets`
+- [x] Subscriptions tracking — `/dashboard/subscriptions`
 - [ ] Weekly/monthly summary reports
-- [ ] Budget tracking (spend vs limit)
-- [ ] Export to CSV
 - [ ] Additional dashboards (top merchants, recurring transactions)
 
-**Phase 3: Account & Compliance** (later)
-- [ ] Privacy & Security section (data access, connected integrations)
-- [ ] Danger zone (delete account, export all data)
-- [ ] Billing page (plan, payment methods, invoices)
+**Phase 3: Data & Security** (in progress on `data_security` branch)
+- [ ] **Import & Export panel** — CSV export for transactions and subscriptions. Client-side formatting + browser download (reuses existing `getAllTransactionsRaw` + `getSubscriptions` server actions; no new endpoints). Files: `transactions-<YYYY-MM-DD>.csv` (columns: `date, type, amount, category, payment_mode, note`) and `subscriptions-<YYYY-MM-DD>.csv` (columns: `name, amount, billing_cycle, next_billing_date, category, payment_mode, status, notes`).
+- [ ] **Privacy & Security panel** — read-only display (email + verification badge, sign-in method: Google OAuth / Email & Password) + danger section with two-step "Delete Account" flow (type "DELETE" to confirm → `deleteAccountAction` removes via Supabase admin client). Requires `SUPABASE_SERVICE_ROLE_KEY` env var.
+- [ ] **Categories transaction_type fix** — surface the existing `transaction_type` backend field via a pill group (Both / Expenses / Income) in the create/edit category modal.
+- [ ] **Profile nav cleanup** — remove four stub items that don't apply to a personal expense tracker: Connected Integrations, Current Plan, Payment Methods, Billing History.
+
+**Phase 4: Later**
+- [ ] Full `/dashboard/transactions` list with filters (category, date range, type)
 - [ ] Role-based access (shared accounts, read-only members)
-- [ ] Subscriptions tracking
 
 ---
 
