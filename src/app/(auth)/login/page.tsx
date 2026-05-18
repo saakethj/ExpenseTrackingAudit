@@ -1,7 +1,12 @@
+import { Suspense } from "react";
 import { AuthCard } from "@/components/auth-card";
 
 export const metadata = { title: "Sign in — ExpenseTracking Audit" };
 
 export default function LoginPage() {
-  return <AuthCard mode="login" />;
+  return (
+    <Suspense fallback={null}>
+      <AuthCard mode="login" />
+    </Suspense>
+  );
 }

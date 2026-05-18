@@ -16,11 +16,11 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 - Dashboard aggregates: `getMonthlySummary()` fetches **all user rows** (no date filter), aggregates in JS — computes current month + previous month + all-time totals. Returns `{ spent, income, net, savingsRate, expenseCount, incomeSourceCount, deltas, categories, monthLabel, balance, totalTransactions, firstTransactionDate }`. Balance is the honest all-time income − spend (always accurate regardless of import timing). Deltas: `%` for amounts, `pp` (percentage points) for savings rate. Null deltas render `—`. Spent-card delta arrow inverts (down = green, up = red). Category breakdown rolls categories past top 5 into an "Other" row. Monthly "Cash flow" card clarifies it's a flow, not net worth.
 - Analytics hub (`/dashboard/analytics`): interactive four-chart section with time range filters (30d | 3m | 6m | 12m | all). Fetches all transactions once, aggregates client-side. Shows (1) monthly income vs expense bar chart, (2) category donut + ranked list with percentages, (3) cumulative daily spend area chart, (4) payment mode donut (cash/card/upi/bank/other). KPI strip shows income/spent/net/savings-rate scoped to selected range. All chart colors use `var(--purple)` / `var(--orange)` CSS vars — theme-aware, accent-color-aware. Built with Recharts.
 
-**⏳ In progress — Data & Security phase (branch: `data_security`):**
-- Import & Export panel — CSV export for transactions + subscriptions. Client-side formatting + browser download. Reuses existing `getAllTransactionsRaw` + `getSubscriptions` server actions; no new endpoints.
-- Privacy & Security panel — read-only account display (email + verification + sign-in method) + two-step "Delete Account" flow (type "DELETE" → `deleteAccountAction` removes via Supabase admin client). Requires `SUPABASE_SERVICE_ROLE_KEY` env var (server-only, no `NEXT_PUBLIC_` prefix).
-- Categories `transaction_type` pill — surface existing backend field via a Both / Expenses / Income pill group in the create/edit category modal.
-- Profile nav cleanup — remove four dead stub items from `profile-shell.tsx`: `integrations`, `plan`, `payment-methods`, `billing-history`.
+**✅ Data & Security phase (PARTIAL):**
+- ✅ Import & Export panel — CSV export for transactions + subscriptions. Client-side formatting + browser download. Reuses existing `getAllTransactionsRaw` + `getSubscriptions` server actions. Filenames: `transactions-YYYY-MM-DD.csv` / `subscriptions-YYYY-MM-DD.csv`. UTF-8 BOM + RFC 4180 quoting + formula injection prevention (leading `=+-@` prefixed with `'`). Available under Profile → Import & Export.
+- ⏳ Privacy & Security panel — deferred (would duplicate existing General panel email + password sections). Stubs remain in nav for future use.
+- ⏳ Categories `transaction_type` pill — deferred to later phase.
+- ⏳ Profile nav cleanup — deferred. All stubs (`integrations`, `plan`, `payment-methods`, `billing-history`) remain as placeholders for future billing/integrations features.
 
 **📋 Later:** Full `/dashboard/transactions` list page with filters (category, date range, type) · Role-based access (shared accounts, read-only members)
 
@@ -42,11 +42,11 @@ A secure, multi-user financial dashboard. Design and security are first-class.
 - Weekly/monthly summary reports
 - Additional dashboards (top merchants, recurring transactions)
 
-**Phase 3: Data & Security (IN PROGRESS — branch `data_security`)**
-1. Import & Export panel — `src/components/export-panel.tsx` (new). Client component. CSV export for transactions (`date, type, amount, category, payment_mode, note`) and subscriptions (`name, amount, billing_cycle, next_billing_date, category, payment_mode, status, notes`). Filenames: `transactions-<YYYY-MM-DD>.csv` / `subscriptions-<YYYY-MM-DD>.csv`. Reuses existing server actions; no new endpoints. Download via `URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))` + auto-click `<a download>`.
-2. Privacy & Security panel — `src/components/privacy-security-panel.tsx` (new). Read-only sections: email + verification badge, sign-in method (Google OAuth / Email & Password). Danger section: two-step "Delete Account" (type "DELETE" → confirm → `deleteAccountAction`). New server action `deleteAccountAction` in `src/app/actions/account-actions.ts` uses admin client (`src/lib/supabase/admin.ts`) to call `admin.auth.admin.deleteUser(userId)`, then signs out session cookie. Requires `SUPABASE_SERVICE_ROLE_KEY` env var.
-3. Categories panel — add `transaction_type` pill group (Both / Expenses / Income) in create/edit modal. Backend already accepts the field; UI just needs to expose it.
-4. Profile nav cleanup — remove `integrations`, `plan`, `payment-methods`, `billing-history` from `profile-shell.tsx`.
+**Phase 3: Data & Security (PARTIAL — Import & Export shipped)**
+1. ✅ Import & Export panel — `src/components/export-panel.tsx`. Client component. CSV export for transactions (`date, type, amount, category, payment_mode, note`) and subscriptions (`name, amount, billing_cycle, next_billing_date, category, payment_mode, status, notes`). Filenames: `transactions-<YYYY-MM-DD>.csv` / `subscriptions-<YYYY-MM-DD>.csv`. Reuses existing server actions. Download via `URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))` + auto-click `<a download>`.
+2. 📋 Privacy & Security panel — deferred (would duplicate email + password sections already in General panel). Can add in Phase 4 if needed.
+3. 📋 Categories panel — add `transaction_type` pill group (Both / Expenses / Income). Backend ready, UI deferred.
+4. 📋 Profile nav cleanup — deferred. Stubs kept for future Billing & Integrations phases.
 
 **Phase 4: Later**
 - Full `/dashboard/transactions` list with filters (category, date range, type) — reuses existing row + modal

@@ -1,4 +1,5 @@
 import { DashboardNav } from "@/components/dashboard-nav";
+import { IdleTimer } from "@/components/idle-timer";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,7 @@ export default function DashboardLayout({
             "radial-gradient(45% 40% at 85% 15%, var(--purple-soft) 0%, transparent 65%), radial-gradient(40% 35% at 10% 85%, var(--orange-soft) 0%, transparent 65%)",
         }}
       />
+      <IdleTimer />
       <DashboardNav />
       <main className="relative z-10 flex flex-1 flex-col">{children}</main>
     </div>

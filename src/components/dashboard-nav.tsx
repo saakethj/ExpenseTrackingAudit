@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image"; // Add this import
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
@@ -35,23 +35,21 @@ export function DashboardNav() {
       <div className="glass-pill mx-auto max-w-7xl rounded-2xl">
         <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-7 md:grid md:grid-cols-[1fr_auto_1fr]">
           
-          {/* UPDATED LOGO SECTION */}
           <div className="flex items-center">
             <Link
               href="/dashboard"
-              className="group flex items-center transition-transform duration-300 hover:scale-105"
+              className="flex items-center rounded-xl overflow-hidden transition-opacity hover:opacity-90"
             >
               <Image
-                src="/logo.png" // Make sure this matches your filename in the public folder
-                alt="ETM Logo"
-                width={240}
-                height={60}
-                className="h-11 w-auto sm:h-14"
+                src="/logo.png"
+                alt="ExpenseTrackingManagement"
+                width={612}
+                height={408}
+                style={{ height: '90px', width: 'auto' }}
                 priority
               />
             </Link>
           </div>
-          {/* END UPDATED LOGO SECTION */}
 
           <nav className="hidden items-center gap-1 md:flex">
             {NAV_ITEMS.map((item) => {

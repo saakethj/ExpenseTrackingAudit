@@ -28,7 +28,25 @@ export async function updateSession(request: NextRequest) {
   // IMPORTANT: Do not run code between createServerClient and getUser().
   // getUser() refreshes the auth token; anything in between can cause
   // hard-to-debug session bugs.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const path = request.nextUrl.pathname;
+
+  // Unauthenticated users must not access the dashboard.
+  if (!user && path.startsWith("/dashboard")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Authenticated users don't need the auth pages.
+  if (user && (path === "/login" || path === "/signup")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }

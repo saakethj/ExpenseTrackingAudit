@@ -1,5 +1,6 @@
-import { ThemeToggle } from "@/components/theme-toggle";
+import Image from "next/image";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function AuthLayout({
   children,
@@ -11,15 +12,15 @@ export default function AuthLayout({
       <div className="auth-backdrop" />
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
-        <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <span
-            className="inline-block h-6 w-6 rounded-md"
-            style={{
-              background:
-                "linear-gradient(135deg, var(--purple) 0%, var(--orange) 100%)",
-            }}
+        <Link href="/" className="flex items-center transition-opacity hover:opacity-90">
+          <Image
+            src="/logo.png"
+            alt="ExpenseTrackingManagement"
+            width={612}
+            height={408}
+            style={{ height: '90px', width: 'auto' }}
+            priority
           />
-          ExpenseTracking <span className="text-muted-foreground">Audit</span>
         </Link>
         <ThemeToggle />
       </header>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { GoogleButton } from "./google-button";
@@ -11,34 +11,53 @@ import { createClient } from "@/lib/supabase/client";
 type Mode = "login" | "signup";
 type Status = "idle" | "submitting" | "success" | "error";
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+
 export function AuthCard({ mode }: { mode: Mode }) {
   const isLogin = mode === "login";
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPw, setShowPw] = React.useState(false);
-  const [name, setName] = React.useState("");
+  const [firstName, setFirstName] = React.useState("");
+  const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
+  const [emailTouched, setEmailTouched] = React.useState(false);
   const [password, setPassword] = React.useState("");
   const [status, setStatus] = React.useState<Status>("idle");
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
+  const callbackError = isLogin && searchParams.get("error") === "auth_callback_failed";
+  const timedOut = isLogin && searchParams.get("reason") === "timeout";
+  const emailInvalid = !isLogin && emailTouched && email.length > 0 && !isValidEmail(email);
+
   async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!isValidEmail(email)) {
+      setEmailTouched(true);
+      return;
+    }
     setStatus("submitting");
     setErrorMsg(null);
 
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const supabase = createClient();
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: name },
+        data: { first_name: firstName.trim(), last_name: lastName.trim(), full_name: fullName },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
     if (error) {
       setStatus("error");
-      setErrorMsg(error.message);
+      const msg = error.message.toLowerCase().includes("password")
+        ? "Password must be at least 6 characters."
+        : "Could not create account. Please check your details and try again.";
+      setErrorMsg(msg);
       return;
     }
     setStatus("success");
@@ -113,28 +132,44 @@ export function AuthCard({ mode }: { mode: Mode }) {
         onSubmit={isLogin ? handleLogin : handleSignup}
       >
         {!isLogin && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              id="first-name"
+              label="First name"
+              placeholder="Jane"
+              icon={<User className="h-4 w-4" />}
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+            <Field
+              id="last-name"
+              label="Last name"
+              placeholder="Doe"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </div>
+        )}
+        <div className="space-y-1">
           <Field
-            id="name"
-            label="Full name"
-            placeholder="Jane Doe"
-            icon={<User className="h-4 w-4" />}
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            id="email"
+            label="Email"
+            type="email"
+            placeholder="you@company.com"
+            icon={<Mail className="h-4 w-4" />}
+            autoComplete="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); if (emailTouched) setEmailTouched(false); }}
+            onBlur={() => { if (!isLogin) setEmailTouched(true); }}
             required
           />
-        )}
-        <Field
-          id="email"
-          label="Email"
-          type="email"
-          placeholder="you@company.com"
-          icon={<Mail className="h-4 w-4" />}
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+          {emailInvalid && (
+            <p className="px-1 text-xs text-red-400">Enter a valid email address.</p>
+          )}
+        </div>
         <Field
           id="password"
           label="Password"
@@ -164,21 +199,32 @@ export function AuthCard({ mode }: { mode: Mode }) {
         />
 
         {isLogin && (
-          <div className="flex items-center justify-between text-xs">
-            <label className="inline-flex items-center gap-2 text-muted-foreground">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 rounded border-border bg-transparent accent-[var(--purple)]"
-              />
-              Remember me
-            </label>
+          <div className="flex items-center justify-end text-xs">
             <Link
-              href="#"
+              href="/forgot-password"
               className="text-muted-foreground transition-colors hover:text-foreground"
             >
               Forgot password?
             </Link>
           </div>
+        )}
+
+        {timedOut && (
+          <p
+            role="alert"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+          >
+            You were signed out due to inactivity. Sign in to continue.
+          </p>
+        )}
+
+        {callbackError && (
+          <p
+            role="alert"
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
+            Sign-in failed. Please try again.
+          </p>
         )}
 
         {status === "error" && errorMsg && (
@@ -247,8 +293,11 @@ function CheckEmailCard({ email }: { email: string }) {
       <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
       <p className="mt-3 text-sm text-muted-foreground">
         We sent a confirmation link to{" "}
-        <span className="font-medium text-foreground">{email}</span>. Click it to
-        activate your account.
+        <span className="font-medium text-foreground">{email}</span>.
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Click it to verify your account — you&apos;ll be signed in and taken to your
+        dashboard automatically.
       </p>
       <p className="mt-4 text-xs text-muted-foreground">
         Didn&apos;t get it? Check spam, or{" "}
@@ -259,6 +308,15 @@ function CheckEmailCard({ email }: { email: string }) {
           try again
         </Link>
         .
+      </p>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Already confirmed?{" "}
+        <Link
+          href="/login"
+          className="text-foreground underline-offset-4 hover:text-purple hover:underline"
+        >
+          Sign in
+        </Link>
       </p>
     </motion.div>
   );
@@ -285,6 +343,7 @@ function Field({
   accent = "purple",
   value,
   onChange,
+  onBlur,
   required,
   minLength,
 }: {
@@ -298,6 +357,7 @@ function Field({
   accent?: "purple" | "orange";
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: () => void;
   required?: boolean;
   minLength?: number;
 }) {
@@ -323,6 +383,7 @@ function Field({
           autoComplete={autoComplete}
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           required={required}
           minLength={minLength}
           className={`input-glow ${accent === "orange" ? "alt" : ""} w-full rounded-xl border border-input bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 transition-all duration-200 ${icon ? "pl-9" : ""} ${trailing ? "pr-10" : ""}`}

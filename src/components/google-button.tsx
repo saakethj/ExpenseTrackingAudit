@@ -15,6 +15,10 @@ export function GoogleButton({
   async function handleClick() {
     setLoading(true);
     setError(null);
+
+    // Safety net: reset the button if navigation never fires (e.g. popup blocked).
+    const timeout = setTimeout(() => setLoading(false), 15_000);
+
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -24,7 +28,8 @@ export function GoogleButton({
       },
     });
     if (error) {
-      setError(error.message);
+      clearTimeout(timeout);
+      setError("Could not sign in with Google. Please try again.");
       setLoading(false);
     }
   }
